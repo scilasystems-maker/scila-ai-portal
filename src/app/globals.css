@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: #FAFBFC;
+    --foreground: #1E293B;
+    --card: #FFFFFF;
+    --card-foreground: #1E293B;
+    --primary: #7C3AED;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F1F5F9;
+    --secondary-foreground: #475569;
+    --muted: #F1F5F9;
+    --muted-foreground: #64748B;
+    --destructive: #EF4444;
+    --border: #E2E8F0;
+    --input: #E2E8F0;
+    --ring: #7C3AED;
+    --sidebar-bg: #FFFFFF;
+    --sidebar-border: #E2E8F0;
+    --sidebar-text: #475569;
+    --sidebar-text-active: #7C3AED;
+    --sidebar-hover: #F5F3FF;
+    --sidebar-active-bg: #EDE9FE;
+  }
+  .dark {
+    --background: #0B0B14;
+    --foreground: #F8FAFC;
+    --card: #1A1A2E;
+    --card-foreground: #F8FAFC;
+    --primary: #8B5CF6;
+    --primary-foreground: #FFFFFF;
+    --secondary: #1E293B;
+    --secondary-foreground: #94A3B8;
+    --muted: #1E293B;
+    --muted-foreground: #64748B;
+    --destructive: #EF4444;
+    --border: #334155;
+    --input: #334155;
+    --ring: #8B5CF6;
+    --sidebar-bg: #111827;
+    --sidebar-border: #1E293B;
+    --sidebar-text: #94A3B8;
+    --sidebar-text-active: #F8FAFC;
+    --sidebar-hover: #1E1B4B;
+    --sidebar-active-bg: #1E1B4B;
+  }
+  * { border-color: var(--border); }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-purple via-brand-blue to-brand-cyan;
+  }
+  .btn-primary {
+    @apply px-4 py-2.5 rounded-lg font-semibold text-sm text-white transition-all duration-200 bg-brand-purple hover:bg-brand-purple-dark shadow-lg hover:shadow-glow-purple active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 border dark:bg-surface dark:text-white dark:hover:bg-surface-hover bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5 text-gray-500 hover:text-gray-700 hover:bg-gray-100;
+  }
+  .btn-danger {
+    @apply px-4 py-2.5 rounded-lg font-semibold text-sm text-white transition-all duration-200 bg-danger hover:bg-danger-dark active:scale-[0.98];
+  }
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 border border-[var(--input)] bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent placeholder:text-[var(--muted-foreground)];
+  }
+  .card {
+    @apply rounded-xl border p-5;
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer;
+    color: var(--sidebar-text);
+  }
+  .sidebar-item:hover { background: var(--sidebar-hover); color: var(--sidebar-text-active); }
+  .sidebar-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-text-active); }
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--muted-foreground); opacity: 0.3; }
