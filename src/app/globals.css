@@ -76,6 +76,16 @@
   }
   .input-field {
     @apply w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 border border-[var(--input)] bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent placeholder:text-[var(--muted-foreground)];
+    color: var(--foreground);
+  }
+  select.input-field {
+    background-color: var(--card);
+    color: var(--foreground);
+  }
+  select.input-field option {
+    background-color: var(--card);
+    color: var(--foreground);
+    padding: 8px;
   }
   .card {
     @apply rounded-xl border p-5;
