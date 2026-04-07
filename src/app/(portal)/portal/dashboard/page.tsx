@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Header } from "@/components/shared/Header";
-import { DailyChart, StatusDonut, RolesBar, ActivityHeatmap, KPICard } from "@/components/charts/Charts";
+import { DailyChart, StatusDonut, RolesBar, ActivityHeatmap, KPICard, TopContacts } from "@/components/charts/Charts";
 import {
   MessageSquare, Calendar, Users, Clock, DollarSign, Zap,
-  TrendingUp, ArrowUpRight, Loader2, BarChart3, Timer, Bot
+  TrendingUp, ArrowUpRight, Loader2, BarChart3, Timer, Bot, UserCheck
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ interface ModuleMetrics {
   hourly_heatmap: { hour: number; day: number; count: number }[];
   roles_distribution: { name: string; value: number }[];
   avg_response_time: number;
+  top_contacts: { name: string; phone: string; count: number }[];
 }
 
 const PERIODS = [
@@ -254,6 +255,17 @@ export default function PortalDashboard() {
                 <h3 className="font-semibold text-sm">Mensajes: Agente vs Cliente</h3>
               </div>
               <RolesBar data={mod.roles_distribution} />
+            </div>
+          ))}
+
+          {/* Top contacts */}
+          {allModules.filter(m => m.top_contacts?.length > 0).map(mod => (
+            <div key={`top-${mod.id}`} className="card">
+              <div className="flex items-center gap-2 mb-4">
+                <UserCheck className="w-4 h-4 text-brand-purple" />
+                <h3 className="font-semibold text-sm">Contactos más activos</h3>
+              </div>
+              <TopContacts data={mod.top_contacts} />
             </div>
           ))}
 

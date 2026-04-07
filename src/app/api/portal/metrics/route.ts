@@ -178,6 +178,23 @@ export async function GET(request: Request) {
           avgResponseTime = responseCount > 0 ? Math.round(totalTime / responseCount / 1000) : 0;
         }
 
+        // ── Top contacts (for conversations) ──
+        let topContacts: { name: string; phone: string; count: number }[] = [];
+        if (mod.tipo === "conversaciones") {
+          const phoneField = campos.telefono || "telefono";
+          const nameCol = campos.nombre_cliente || "nombre_cliente";
+          const contactMap: Record<string, { name: string; phone: string; count: number }> = {};
+          allRecords.forEach((r: any) => {
+            const phone = r[phoneField];
+            if (!phone) return;
+            if (!contactMap[phone]) {
+              contactMap[phone] = { name: r[nameCol] || phone, phone, count: 0 };
+            }
+            contactMap[phone].count++;
+          });
+          topContacts = Object.values(contactMap).sort((a, b) => b.count - a.count).slice(0, 6);
+        }
+
         // Calculate change percentage
         const change = prevCount && prevCount > 0
           ? Math.round(((currentCount || 0) - prevCount) / prevCount * 100)
@@ -196,6 +213,7 @@ export async function GET(request: Request) {
           hourly_heatmap: hourlyData,
           roles_distribution: rolesDist,
           avg_response_time: avgResponseTime,
+          top_contacts: topContacts,
         };
       } catch (err: any) {
         console.error(`Metrics error for ${tabla}:`, err.message);

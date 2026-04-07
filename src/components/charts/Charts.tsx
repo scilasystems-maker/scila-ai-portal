@@ -254,3 +254,39 @@ function EmptyChart() {
     </div>
   );
 }
+
+// ── Top Contacts List ──
+export function TopContacts({ data }: {
+  data: { name: string; phone: string; count: number }[];
+}) {
+  if (!data || data.length === 0) return <EmptyChart />;
+
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+
+  return (
+    <div className="space-y-3">
+      {data.slice(0, 6).map((contact, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-brand-purple/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-[10px] font-bold text-brand-purple">
+              {contact.name?.[0]?.toUpperCase() || "#"}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium truncate">{contact.name || contact.phone}</span>
+              <span className="text-xs text-[var(--muted-foreground)] flex-shrink-0 ml-2">{contact.count} msgs</span>
+            </div>
+            <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-brand-purple to-brand-cyan transition-all"
+                style={{ width: `${(contact.count / maxCount) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
