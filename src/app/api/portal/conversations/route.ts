@@ -141,7 +141,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "phone es obligatorio" }, { status: 400 });
       }
 
-      // @ts-ignore - dynamic table names cause deep type inference
+      // @ts-expect-error - dynamic table names cause deep type inference
       const { data: messages, error } = await clientDb
         .from(tabla)
         .select("*")
