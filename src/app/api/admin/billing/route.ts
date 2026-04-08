@@ -152,6 +152,9 @@ export async function PATCH(request: Request) {
     const { id, ...updates } = body;
     if (!id) return NextResponse.json({ error: "ID obligatorio" }, { status: 400 });
     if (updates.importe) updates.importe = parseFloat(updates.importe);
+    // Fix empty dates — send null instead of ""
+    if (updates.fecha_vencimiento === "") updates.fecha_vencimiento = null;
+    if (updates.fecha_emision === "") updates.fecha_emision = null;
     const supabase = await createAdminSupabase();
     const { data, error } = await supabase
       .from("portal_facturacion_admin")

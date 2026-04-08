@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/shared/Header";
 import {
   CreditCard, Plus, Loader2, Clock, CheckCircle, XCircle,
-  Edit, Trash2, X, Save, Download
+  Edit, Trash2, X, Save, Download, ChevronDown
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -30,9 +30,17 @@ export default function BillingPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Factura | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
   const [form, setForm] = useState({ cliente_id: "", concepto: "", importe: "", estado: "pendiente", fecha_emision: "", fecha_vencimiento: "", notas: "" });
 
   useEffect(() => { loadData(); }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = () => setStatusDropdown(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -45,6 +53,22 @@ export default function BillingPage() {
       setClients(Array.isArray(clientData) ? clientData : []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  };
+
+  const changeStatus = async (facturaId: string, newEstado: string) => {
+    if (newEstado === "pagado") {
+      if (!confirm("¿Confirmas que esta factura ha sido PAGADA?")) return;
+    }
+    try {
+      const res = await fetch("/api/admin/billing", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: facturaId, estado: newEstado }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      setStatusDropdown(null);
+      loadData();
+    } catch (err: any) { alert(err.message); }
   };
 
   const openCreate = () => {
@@ -63,7 +87,9 @@ export default function BillingPage() {
     setSaving(true);
     try {
       const method = editing ? "PATCH" : "POST";
-      const body = editing ? { id: editing.id, ...form } : form;
+      const payload = { ...form };
+      if (payload.fecha_vencimiento === "") (payload as any).fecha_vencimiento = null;
+      const body = editing ? { id: editing.id, ...payload } : payload;
       const res = await fetch("/api/admin/billing", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       setModalOpen(false); loadData();
@@ -82,8 +108,8 @@ export default function BillingPage() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([headers + rows], { type: "text/csv" })); a.download = `facturacion_${new Date().toISOString().split("T")[0]}.csv`; a.click();
   };
 
-  const estadoColor = (e: string) => e === "pagado" ? "bg-success/10 text-success" : e === "vencido" ? "bg-danger/10 text-danger" : "bg-warning/10 text-warning";
-  const estadoIcon = (e: string) => e === "pagado" ? <CheckCircle className="w-4 h-4" /> : e === "vencido" ? <XCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />;
+  const estadoColor = (e: string) => e === "pagado" ? "bg-success/10 text-success border-success/20" : e === "vencido" ? "bg-danger/10 text-danger border-danger/20" : "bg-warning/10 text-warning border-warning/20";
+  const estadoIcon = (e: string) => e === "pagado" ? <CheckCircle className="w-3.5 h-3.5" /> : e === "vencido" ? <XCircle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />;
 
   const filtered = filter === "todas" ? facturas : facturas.filter(f => f.estado === filter);
 
@@ -119,13 +145,7 @@ export default function BillingPage() {
                 filter === f.id ? "bg-brand-purple/10 text-brand-purple" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
               )}>
               {f.label}
-              {f.id !== "todas" && (
-                <span className="ml-1.5 text-[10px]">
-                  ({f.id === "pendiente" ? facturas.filter(x => x.estado === "pendiente").length :
-                    f.id === "pagado" ? facturas.filter(x => x.estado === "pagado").length :
-                    facturas.filter(x => x.estado === "vencido").length})
-                </span>
-              )}
+              {f.id !== "todas" && <span className="ml-1.5 text-[10px]">({facturas.filter(x => x.estado === f.id).length})</span>}
             </button>
           ))}
         </div>
@@ -136,10 +156,8 @@ export default function BillingPage() {
         ) : filtered.length === 0 ? (
           <div className="card text-center py-12">
             <CreditCard className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-3" />
-            <h3 className="font-semibold mb-2">{filter === "todas" ? "Sin facturas" : `Sin facturas ${filter}s`}</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mb-4">
-              {filter === "todas" ? "Asigna agentes a clientes para generar facturas" : "No hay facturas con este estado"}
-            </p>
+            <h3 className="font-semibold mb-2">{filter === "todas" ? "Sin facturas" : `Sin facturas ${filter === "pendiente" ? "pendientes" : filter === "pagado" ? "pagadas" : "vencidas"}`}</h3>
+            <p className="text-sm text-[var(--muted-foreground)] mb-4">{filter === "todas" ? "Asigna agentes a clientes para generar facturas" : ""}</p>
             {filter !== "todas" && <button onClick={() => setFilter("todas")} className="btn-ghost text-sm">Ver todas</button>}
           </div>
         ) : (
@@ -166,9 +184,33 @@ export default function BillingPage() {
                       <td className="px-4 py-3">{f.concepto}</td>
                       <td className="px-4 py-3 text-right font-semibold">{f.importe}€</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium", estadoColor(f.estado))}>
-                          {estadoIcon(f.estado)}{f.estado}
-                        </span>
+                        <div className="relative inline-block">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setStatusDropdown(statusDropdown === f.id ? null : f.id); }}
+                            className={cn("inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full font-medium border cursor-pointer hover:opacity-80 transition-opacity", estadoColor(f.estado))}
+                          >
+                            {estadoIcon(f.estado)}
+                            {f.estado}
+                            <ChevronDown className="w-3 h-3 ml-0.5" />
+                          </button>
+                          {statusDropdown === f.id && (
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 min-w-[120px]"
+                              onClick={e => e.stopPropagation()}>
+                              {["pendiente", "pagado", "vencido"].map(estado => (
+                                <button key={estado} onClick={() => changeStatus(f.id, estado)}
+                                  className={cn("w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[var(--muted)] transition-colors text-left",
+                                    f.estado === estado && "bg-[var(--muted)] font-semibold"
+                                  )}>
+                                  {estado === "pagado" ? <CheckCircle className="w-3.5 h-3.5 text-success" /> :
+                                   estado === "vencido" ? <XCircle className="w-3.5 h-3.5 text-danger" /> :
+                                   <Clock className="w-3.5 h-3.5 text-warning" />}
+                                  <span className="capitalize">{estado}</span>
+                                  {estado === "pagado" && f.estado !== "pagado" && <span className="text-[9px] text-[var(--muted-foreground)] ml-auto">Confirmar</span>}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">{formatDate(f.fecha_emision)}</td>
                       <td className="px-4 py-3">{f.fecha_vencimiento ? formatDate(f.fecha_vencimiento) : "—"}</td>

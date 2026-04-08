@@ -72,9 +72,8 @@ export async function POST(request: Request) {
       const precioBase = data.portal_agentes.precio || 0;
       const precioFinal = precioCustom !== null ? precioCustom : precioBase;
       const precioConDescuento = precioFinal * (1 - descuento / 100);
-      const periodicidad = data.portal_agentes.periodicidad;
 
-      if (periodicidad !== "unico" && precioConDescuento > 0) {
+      if (precioConDescuento > 0) {
         const now = new Date();
         const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
         const vencimiento = new Date(now);
