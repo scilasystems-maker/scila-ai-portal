@@ -36,19 +36,22 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/admin/client-agentes — Assign agent to client
+// POST /api/admin/client-agentes — Assign agent to client + auto-create invoice
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const supabase = await createAdminSupabase();
+
+    const precioCustom = body.precio_custom !== undefined && body.precio_custom !== "" ? parseFloat(body.precio_custom) : null;
+    const descuento = body.descuento ? parseFloat(body.descuento) : 0;
 
     const { data, error } = await supabase
       .from("portal_cliente_agentes")
       .insert({
         cliente_id: body.cliente_id,
         agente_id: body.agente_id,
-        precio_custom: body.precio_custom !== undefined && body.precio_custom !== "" ? parseFloat(body.precio_custom) : null,
-        descuento: body.descuento ? parseFloat(body.descuento) : 0,
+        precio_custom: precioCustom,
+        descuento,
         fecha_inicio: body.fecha_inicio || new Date().toISOString().split("T")[0],
         fecha_fin: body.fecha_fin || null,
         activo: true,
@@ -63,6 +66,32 @@ export async function POST(request: Request) {
       }
       throw error;
     }
+
+    // Auto-create pending invoice for first payment
+    if (data?.portal_agentes) {
+      const precioBase = data.portal_agentes.precio || 0;
+      const precioFinal = precioCustom !== null ? precioCustom : precioBase;
+      const precioConDescuento = precioFinal * (1 - descuento / 100);
+      const periodicidad = data.portal_agentes.periodicidad;
+
+      if (periodicidad !== "unico" && precioConDescuento > 0) {
+        const now = new Date();
+        const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+        const vencimiento = new Date(now);
+        vencimiento.setDate(vencimiento.getDate() + 30);
+
+        await supabase.from("portal_facturacion_admin").insert({
+          cliente_id: body.cliente_id,
+          concepto: `${data.portal_agentes.nombre} — ${mesActual}`,
+          importe: precioConDescuento,
+          estado: "pendiente",
+          fecha_emision: now.toISOString().split("T")[0],
+          fecha_vencimiento: vencimiento.toISOString().split("T")[0],
+          notas: descuento > 0 ? `Dto ${descuento}% aplicado` : null,
+        });
+      }
+    }
+
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

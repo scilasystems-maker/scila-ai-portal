@@ -3,26 +3,28 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/shared/Header";
 import {
-  CreditCard, Plus, Loader2, AlertCircle, DollarSign, Clock,
-  CheckCircle, XCircle, Edit, Trash2, X, Save, Download
+  CreditCard, Plus, Loader2, DollarSign, Clock, CheckCircle,
+  XCircle, Edit, Trash2, X, Save, Download, CalendarClock,
+  AlertTriangle, Zap
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
 interface Factura {
-  id: string;
-  cliente_id: string;
-  concepto: string;
-  importe: number;
-  estado: string;
-  fecha_emision: string;
-  fecha_vencimiento: string | null;
-  notas: string | null;
-  portal_clientes: { empresa: string; nombre: string; email: string } | null;
+  id: string; cliente_id: string; concepto: string; importe: number;
+  estado: string; fecha_emision: string; fecha_vencimiento: string | null;
+  notas: string | null; portal_clientes: { empresa: string; nombre: string; email: string } | null;
+}
+
+interface UpcomingPayment {
+  id: string; cliente_nombre: string; agente_nombre: string; importe: number;
+  periodicidad: string; fecha_proximo_pago: string; dias_restantes: number;
+  descuento: number | null; es_urgente: boolean;
 }
 
 export default function BillingPage() {
   const [facturas, setFacturas] = useState<Factura[]>([]);
-  const [resumen, setResumen] = useState({ pendiente: 0, pagado: 0, vencido: 0, total: 0 });
+  const [upcoming, setUpcoming] = useState<UpcomingPayment[]>([]);
+  const [resumen, setResumen] = useState({ pendiente: 0, pagado: 0, vencido: 0 });
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,14 +37,12 @@ export default function BillingPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [billRes, clientRes] = await Promise.all([
-        fetch("/api/admin/billing"),
-        fetch("/api/admin/clients"),
-      ]);
+      const [billRes, clientRes] = await Promise.all([fetch("/api/admin/billing"), fetch("/api/admin/clients")]);
       const billData = await billRes.json();
       const clientData = await clientRes.json();
       setFacturas(billData.facturas || []);
-      setResumen(billData.resumen || { pendiente: 0, pagado: 0, vencido: 0, total: 0 });
+      setUpcoming(billData.upcoming || []);
+      setResumen(billData.resumen || { pendiente: 0, pagado: 0, vencido: 0 });
       setClients(Array.isArray(clientData) ? clientData : []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -63,143 +63,178 @@ export default function BillingPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const url = "/api/admin/billing";
       const method = editing ? "PATCH" : "POST";
       const body = editing ? { id: editing.id, ...form } : form;
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch("/api/admin/billing", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      setModalOpen(false);
-      loadData();
+      setModalOpen(false); loadData();
     } catch (err: any) { alert(err.message); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta factura?")) return;
-    await fetch(`/api/admin/billing?id=${id}`, { method: "DELETE" });
-    loadData();
+    await fetch(`/api/admin/billing?id=${id}`, { method: "DELETE" }); loadData();
   };
 
   const exportCSV = () => {
     const headers = "Cliente,Concepto,Importe,Estado,Emisión,Vencimiento,Notas\n";
-    const rows = facturas.map(f =>
-      `"${f.portal_clientes?.empresa || ""}","${f.concepto}",${f.importe},"${f.estado}","${f.fecha_emision}","${f.fecha_vencimiento || ""}","${f.notas || ""}"`
-    ).join("\n");
+    const rows = facturas.map(f => `"${f.portal_clientes?.empresa || ""}","${f.concepto}",${f.importe},"${f.estado}","${f.fecha_emision}","${f.fecha_vencimiento || ""}","${f.notas || ""}"`).join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `facturacion_${new Date().toISOString().split("T")[0]}.csv`; a.click();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `facturacion_${new Date().toISOString().split("T")[0]}.csv`; a.click();
   };
 
-  const estadoIcon = (e: string) => {
-    if (e === "pagado") return <CheckCircle className="w-4 h-4 text-success" />;
-    if (e === "vencido") return <XCircle className="w-4 h-4 text-danger" />;
-    return <Clock className="w-4 h-4 text-warning" />;
-  };
+  const estadoColor = (e: string) => e === "pagado" ? "bg-success/10 text-success" : e === "vencido" ? "bg-danger/10 text-danger" : "bg-warning/10 text-warning";
+  const estadoIcon = (e: string) => e === "pagado" ? <CheckCircle className="w-4 h-4 text-success" /> : e === "vencido" ? <XCircle className="w-4 h-4 text-danger" /> : <Clock className="w-4 h-4 text-warning" />;
 
-  const estadoColor = (e: string) => {
-    if (e === "pagado") return "bg-success/10 text-success";
-    if (e === "vencido") return "bg-danger/10 text-danger";
-    return "bg-warning/10 text-warning";
-  };
+  const facturasPendientes = facturas.filter(f => f.estado === "pendiente");
+  const facturasOtras = facturas.filter(f => f.estado !== "pendiente");
 
   return (
     <>
       <Header title="Facturación" subtitle="Control de cobros a clientes">
-        <button onClick={exportCSV} className="btn-ghost flex items-center gap-2" title="Exportar CSV">
-          <Download className="w-4 h-4" />
-          <span className="hidden sm:inline">CSV</span>
-        </button>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nueva factura</span>
-        </button>
+        <button onClick={exportCSV} className="btn-ghost flex items-center gap-2"><Download className="w-4 h-4" /><span className="hidden sm:inline">CSV</span></button>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /><span className="hidden sm:inline">Nueva factura</span></button>
       </Header>
 
       <div className="p-4 lg:p-6 space-y-6">
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 3 Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="card">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-5 h-5 text-brand-purple" />
-              <span className="text-sm text-[var(--muted-foreground)]">Total facturado</span>
-            </div>
-            <p className="text-2xl font-bold">{resumen.total.toFixed(0)}€</p>
-          </div>
-          <div className="card">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-5 h-5 text-success" />
-              <span className="text-sm text-[var(--muted-foreground)]">Cobrado</span>
-            </div>
+            <div className="flex items-center gap-2 mb-2"><CheckCircle className="w-5 h-5 text-success" /><span className="text-sm text-[var(--muted-foreground)]">Total cobrado</span></div>
             <p className="text-2xl font-bold text-success">{resumen.pagado.toFixed(0)}€</p>
           </div>
           <div className="card">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-5 h-5 text-warning" />
-              <span className="text-sm text-[var(--muted-foreground)]">Pendiente</span>
-            </div>
+            <div className="flex items-center gap-2 mb-2"><Clock className="w-5 h-5 text-warning" /><span className="text-sm text-[var(--muted-foreground)]">Pendiente de cobro</span></div>
             <p className="text-2xl font-bold text-warning">{resumen.pendiente.toFixed(0)}€</p>
           </div>
           <div className="card">
-            <div className="flex items-center gap-2 mb-2">
-              <XCircle className="w-5 h-5 text-danger" />
-              <span className="text-sm text-[var(--muted-foreground)]">Vencido</span>
-            </div>
+            <div className="flex items-center gap-2 mb-2"><XCircle className="w-5 h-5 text-danger" /><span className="text-sm text-[var(--muted-foreground)]">Vencido</span></div>
             <p className="text-2xl font-bold text-danger">{resumen.vencido.toFixed(0)}€</p>
           </div>
         </div>
 
-        {/* Facturas list */}
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-brand-purple" /></div>
-        ) : facturas.length === 0 ? (
-          <div className="card text-center py-12">
-            <CreditCard className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-3" />
-            <h3 className="font-semibold mb-2">Sin facturas</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mb-4">Crea tu primera factura para empezar a llevar el control</p>
-            <button onClick={openCreate} className="btn-primary"><Plus className="w-4 h-4 mr-2 inline" />Nueva factura</button>
-          </div>
         ) : (
-          <div className="card p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Cliente</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Concepto</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Importe</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Estado</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Emisión</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Vencimiento</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase w-24">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {facturas.map(f => (
-                    <tr key={f.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
-                      <td className="px-4 py-3 font-medium">{f.portal_clientes?.empresa || f.portal_clientes?.nombre || "—"}</td>
-                      <td className="px-4 py-3">{f.concepto}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{f.importe}€</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium", estadoColor(f.estado))}>
-                          {estadoIcon(f.estado)}
-                          {f.estado}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{formatDate(f.fecha_emision)}</td>
-                      <td className="px-4 py-3 text-sm">{f.fecha_vencimiento ? formatDate(f.fecha_vencimiento) : "—"}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <button onClick={() => openEdit(f)} className="p-1.5 rounded hover:bg-brand-purple/10 text-[var(--muted-foreground)] hover:text-brand-purple"><Edit className="w-4 h-4" /></button>
-                          <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger"><Trash2 className="w-4 h-4" /></button>
+          <>
+            {/* Pending invoices */}
+            {facturasPendientes.length > 0 && (
+              <div className="card border-warning/20">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-warning" />
+                  Facturas pendientes ({facturasPendientes.length})
+                </h3>
+                <div className="space-y-2">
+                  {facturasPendientes.map(f => (
+                    <div key={f.id} className="flex items-center justify-between p-3 rounded-lg border border-warning/20 bg-warning/5">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{f.concepto}</p>
+                          <p className="text-xs text-[var(--muted-foreground)]">
+                            {f.portal_clientes?.empresa || "—"} · Emitida {formatDate(f.fecha_emision)}
+                            {f.fecha_vencimiento && ` · Vence ${formatDate(f.fecha_vencimiento)}`}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold">{f.importe}€</span>
+                        <button onClick={() => openEdit(f)} className="p-1.5 rounded hover:bg-brand-purple/10 text-[var(--muted-foreground)] hover:text-brand-purple"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming Payments */}
+            {upcoming.length > 0 && (
+              <div className="card">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-brand-purple" />
+                  Próximas facturas de agentes
+                </h3>
+                <div className="space-y-2">
+                  {upcoming.map(payment => (
+                    <div key={payment.id} className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border",
+                      payment.es_urgente ? "border-warning/30 bg-warning/5" : "border-[var(--border)]"
+                    )}>
+                      <div className="flex items-center gap-3">
+                        {payment.es_urgente && <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />}
+                        <Zap className="w-4 h-4 text-brand-purple flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{payment.agente_nombre} — <span className="text-[var(--muted-foreground)]">{payment.cliente_nombre}</span></p>
+                          <p className="text-xs text-[var(--muted-foreground)]">
+                            {formatDate(payment.fecha_proximo_pago)} · {payment.dias_restantes === 0 ? "Hoy" : payment.dias_restantes === 1 ? "Mañana" : `En ${payment.dias_restantes} días`}
+                            {payment.es_urgente && " — Se generará factura pendiente automáticamente"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-bold text-sm">{payment.importe.toFixed(2)}€</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All invoices table */}
+            {facturas.length > 0 && (
+              <div className="card">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-[var(--muted-foreground)]" />
+                  Historial de facturas ({facturas.length})
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border)]">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Cliente</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Concepto</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Importe</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Estado</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Emisión</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase">Vencimiento</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase w-24">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {facturas.map(f => (
+                        <tr key={f.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
+                          <td className="px-4 py-3 font-medium">{f.portal_clientes?.empresa || f.portal_clientes?.nombre || "—"}</td>
+                          <td className="px-4 py-3">{f.concepto}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{f.importe}€</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium", estadoColor(f.estado))}>
+                              {estadoIcon(f.estado)}{f.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">{formatDate(f.fecha_emision)}</td>
+                          <td className="px-4 py-3">{f.fecha_vencimiento ? formatDate(f.fecha_vencimiento) : "—"}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => openEdit(f)} className="p-1.5 rounded hover:bg-brand-purple/10 text-[var(--muted-foreground)] hover:text-brand-purple"><Edit className="w-4 h-4" /></button>
+                              <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {facturas.length === 0 && upcoming.length === 0 && (
+              <div className="card text-center py-12">
+                <CreditCard className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <h3 className="font-semibold mb-2">Sin facturas</h3>
+                <p className="text-sm text-[var(--muted-foreground)] mb-4">Asigna agentes a clientes para generar facturas automáticamente</p>
+                <button onClick={openCreate} className="btn-primary"><Plus className="w-4 h-4 mr-2 inline" />Nueva factura</button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Modal */}
@@ -216,18 +251,18 @@ export default function BillingPage() {
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Cliente *</label>
                     <select className="input-field" value={form.cliente_id} onChange={e => setForm(p => ({ ...p, cliente_id: e.target.value }))}>
-                      <option value="">Seleccionar cliente</option>
+                      <option value="">Seleccionar</option>
                       {clients.map((c: any) => <option key={c.id} value={c.id}>{c.empresa || c.nombre || c.email}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Concepto *</label>
-                    <input className="input-field" value={form.concepto} onChange={e => setForm(p => ({ ...p, concepto: e.target.value }))} placeholder="Agente WhatsApp - Abril 2026" />
+                    <input className="input-field" value={form.concepto} onChange={e => setForm(p => ({ ...p, concepto: e.target.value }))} placeholder="HERMES — mayo 2026" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1.5">Importe (€) *</label>
-                      <input type="number" className="input-field" value={form.importe} onChange={e => setForm(p => ({ ...p, importe: e.target.value }))} placeholder="150" />
+                      <input type="number" className="input-field" value={form.importe} onChange={e => setForm(p => ({ ...p, importe: e.target.value }))} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1.5">Estado</label>
@@ -244,13 +279,13 @@ export default function BillingPage() {
                       <input type="date" className="input-field" value={form.fecha_emision} onChange={e => setForm(p => ({ ...p, fecha_emision: e.target.value }))} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1.5">Fecha vencimiento</label>
+                      <label className="block text-sm font-medium mb-1.5">Vencimiento</label>
                       <input type="date" className="input-field" value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Notas</label>
-                    <textarea className="input-field min-h-[60px]" value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Notas internas..." />
+                    <textarea className="input-field min-h-[60px]" value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
                   </div>
                   <div className="flex justify-end gap-3 pt-2">
                     <button onClick={() => setModalOpen(false)} className="btn-secondary">Cancelar</button>

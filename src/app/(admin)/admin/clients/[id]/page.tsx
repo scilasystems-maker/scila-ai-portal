@@ -343,7 +343,7 @@ export default function ClientDetailPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Módulos configurados ({modules.length})</h3>
-            <Link href="/admin/clients/new" className="text-xs text-brand-purple">Re-configurar módulos →</Link>
+            <button onClick={() => alert("La re-configuración de módulos se implementará próximamente. Por ahora puedes eliminar el cliente y crearlo de nuevo con los módulos correctos.")} className="text-xs text-brand-purple hover:text-brand-purple-light">Re-configurar módulos →</button>
           </div>
 
           {modules.length === 0 ? (
