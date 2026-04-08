@@ -573,6 +573,12 @@ export default function NewClientWizard() {
                         <span className="text-warning">{totals.oneTime.toFixed(2)}€</span>
                       </div>
                     )}
+                    {(totals.monthly > 0 || totals.oneTime > 0) && (
+                      <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t border-[var(--border)]">
+                        <span>Total primer mes</span>
+                        <span className="gradient-text">{totals.total.toFixed(2)}€</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
