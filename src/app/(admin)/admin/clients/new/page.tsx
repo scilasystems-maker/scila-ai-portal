@@ -1,18 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/shared/Header";
 import {
   ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, Database,
   User, Key, Search, Puzzle, Eye, Rocket, ChevronDown, ChevronUp,
-  Users, Calendar, MessageSquare, LayoutGrid, Image, Table2, Kanban
+  Users, Calendar, MessageSquare, LayoutGrid, Image, Table2, Kanban,
+  Zap, Plus, Trash2, DollarSign, Percent, X
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
-  { id: 1, label: "Datos", icon: User, desc: "Información del cliente" },
+  { id: 1, label: "Datos", icon: User, desc: "Info + Agentes" },
   { id: 2, label: "Credenciales", icon: Key, desc: "Conexión Supabase" },
   { id: 3, label: "Tablas", icon: Database, desc: "Detección automática" },
   { id: 4, label: "Módulos", icon: Puzzle, desc: "Mapeo de tablas" },
@@ -53,6 +54,31 @@ interface ModuleConfig {
   permite_eliminar: boolean;
 }
 
+interface Agente {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  precio: number;
+  periodicidad: string;
+  activo: boolean;
+}
+
+interface SelectedAgent {
+  agente_id: string;
+  nombre: string;
+  precio_base: number;
+  precio_custom: string;
+  descuento: string;
+  periodicidad: string;
+  notas: string;
+}
+
+interface ExtraConcept {
+  concepto: string;
+  importe: string;
+  notas: string;
+}
+
 export default function NewClientWizard() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -61,8 +87,14 @@ export default function NewClientWizard() {
 
   // Step 1: Client data
   const [clientData, setClientData] = useState({
-    email: "", nombre: "", empresa: "", plan: "basico", coste_hora: "15", minutos_por_conv: "5",
+    email: "", nombre: "", empresa: "", coste_hora: "15", minutos_por_conv: "5",
   });
+
+  // Step 1: Agents
+  const [allAgentes, setAllAgentes] = useState<Agente[]>([]);
+  const [selectedAgents, setSelectedAgents] = useState<SelectedAgent[]>([]);
+  const [extraConcepts, setExtraConcepts] = useState<ExtraConcept[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
 
   // Step 2: Supabase credentials
   const [credentials, setCredentials] = useState({ supabase_url: "", supabase_key: "" });
@@ -71,7 +103,7 @@ export default function NewClientWizard() {
   const [tables, setTables] = useState<DetectedTable[]>([]);
   const [expandedTable, setExpandedTable] = useState<string | null>(null);
 
-  // Step 4: Selected tables and their module types
+  // Step 4: Selected tables and module types
   const [selectedTables, setSelectedTables] = useState<Record<string, string>>({});
 
   // Step 5: Module configurations
@@ -79,6 +111,78 @@ export default function NewClientWizard() {
 
   // Step 7: Result
   const [result, setResult] = useState<any>(null);
+
+  // Load agents catalog on mount
+  useEffect(() => {
+    loadAgentes();
+  }, []);
+
+  const loadAgentes = async () => {
+    setLoadingAgents(true);
+    try {
+      const res = await fetch("/api/admin/agentes");
+      const data = await res.json();
+      setAllAgentes(Array.isArray(data) ? data.filter((a: Agente) => a.activo) : []);
+    } catch (err) { console.error(err); }
+    finally { setLoadingAgents(false); }
+  };
+
+  // ── Agent Management ──
+  const addAgent = (agente: Agente) => {
+    if (selectedAgents.find(a => a.agente_id === agente.id)) return;
+    setSelectedAgents(prev => [...prev, {
+      agente_id: agente.id,
+      nombre: agente.nombre,
+      precio_base: agente.precio,
+      precio_custom: "",
+      descuento: "0",
+      periodicidad: agente.periodicidad,
+      notas: "",
+    }]);
+  };
+
+  const removeAgent = (agenteId: string) => {
+    setSelectedAgents(prev => prev.filter(a => a.agente_id !== agenteId));
+  };
+
+  const updateAgent = (agenteId: string, field: string, value: string) => {
+    setSelectedAgents(prev => prev.map(a =>
+      a.agente_id === agenteId ? { ...a, [field]: value } : a
+    ));
+  };
+
+  const addExtraConcept = () => {
+    setExtraConcepts(prev => [...prev, { concepto: "", importe: "", notas: "" }]);
+  };
+
+  const removeExtraConcept = (index: number) => {
+    setExtraConcepts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateExtraConcept = (index: number, field: string, value: string) => {
+    setExtraConcepts(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
+  };
+
+  // Calculate total
+  const calculateTotal = () => {
+    let monthly = 0;
+    let oneTime = 0;
+
+    selectedAgents.forEach(agent => {
+      const price = agent.precio_custom ? parseFloat(agent.precio_custom) : agent.precio_base;
+      const discount = parseFloat(agent.descuento) || 0;
+      const final = price * (1 - discount / 100);
+      if (agent.periodicidad === "mensual") monthly += final;
+      else if (agent.periodicidad === "unico") oneTime += final;
+      else monthly += final; // treat others as recurring
+    });
+
+    extraConcepts.forEach(ec => {
+      oneTime += parseFloat(ec.importe) || 0;
+    });
+
+    return { monthly, oneTime, total: monthly + oneTime };
+  };
 
   // ── Step Navigation ──
   const canGoNext = () => {
@@ -105,49 +209,34 @@ export default function NewClientWizard() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-
       const detected = data.tables || data || [];
       setTables(detected);
-      if (detected.length === 0) {
-        setError("No se encontraron tablas en este proyecto de Supabase.");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      if (detected.length === 0) setError("No se encontraron tablas.");
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
-  // ── Step 4: Toggle table selection ──
+  // ── Step 4: Toggle table ──
   const toggleTable = (tableName: string, moduleType: string) => {
     setSelectedTables(prev => {
       const next = { ...prev };
       if (next[tableName] === moduleType) {
         delete next[tableName];
-        // Also remove config
-        setModuleConfigs(prev2 => {
-          const next2 = { ...prev2 };
-          delete next2[tableName];
-          return next2;
-        });
+        setModuleConfigs(prev2 => { const n = { ...prev2 }; delete n[tableName]; return n; });
       } else {
         next[tableName] = moduleType;
-        // Auto-create config
         const table = tables.find(t => t.name === tableName);
         const columns = table?.columns || [];
         const autoMap = autoMapColumns(columns, moduleType);
         setModuleConfigs(prev2 => ({
           ...prev2,
           [tableName]: {
-            tabla_origen: tableName,
-            tipo: moduleType,
+            tabla_origen: tableName, tipo: moduleType,
             nombre_display: formatTableName(tableName),
             icono: getModuleIcon(moduleType),
             mapeo_campos: autoMap,
-            config_visual: { tipo_vista: moduleType === "conversaciones" ? "tabla" : "tabla" },
-            permite_crear: true,
-            permite_editar: true,
-            permite_eliminar: false,
+            config_visual: { tipo_vista: "tabla" },
+            permite_crear: true, permite_editar: true, permite_eliminar: false,
           },
         }));
       }
@@ -160,13 +249,17 @@ export default function NewClientWizard() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create client
+      // 1. Create client (plan based on agents)
+      const totals = calculateTotal();
+      const plan = totals.monthly >= 400 ? "enterprise" : totals.monthly >= 200 ? "pro" : "basico";
+
       const clientRes = await fetch("/api/admin/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...clientData,
           ...credentials,
+          plan,
           coste_hora: parseFloat(clientData.coste_hora),
           minutos_por_conv: parseInt(clientData.minutos_por_conv),
         }),
@@ -186,13 +279,50 @@ export default function NewClientWizard() {
         if (!modRes.ok) throw new Error(modData.error);
       }
 
-      setResult(client);
+      // 3. Assign agents
+      for (const agent of selectedAgents) {
+        await fetch("/api/admin/client-agentes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cliente_id: client.id,
+            agente_id: agent.agente_id,
+            precio_custom: agent.precio_custom || null,
+            descuento: agent.descuento || "0",
+            fecha_inicio: new Date().toISOString().split("T")[0],
+            notas: agent.notas || null,
+          }),
+        });
+      }
+
+      // 4. Create billing entries for extra concepts
+      for (const ec of extraConcepts) {
+        if (ec.concepto && ec.importe) {
+          await fetch("/api/admin/billing", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_id: client.id,
+              concepto: ec.concepto,
+              importe: ec.importe,
+              estado: "pendiente",
+              notas: ec.notas || null,
+            }),
+          });
+        }
+      }
+
+      setResult({ ...client, totals: calculateTotal() });
       setStep(7);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  const totals = calculateTotal();
+  const availableAgents = allAgentes.filter(a => !selectedAgents.find(sa => sa.agente_id === a.id));
+
+  const periodicidadLabel = (p: string) => {
+    switch (p) { case "mensual": return "/mes"; case "anual": return "/año"; case "trimestral": return "/trim"; case "unico": return "(único)"; default: return ""; }
   };
 
   return (
@@ -200,12 +330,8 @@ export default function NewClientWizard() {
       <Header title="Nuevo Cliente" subtitle="Wizard de creación" />
 
       <div className="p-4 lg:p-6 max-w-4xl mx-auto">
-        <Link
-          href="/admin/clients"
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver a clientes
+        <Link href="/admin/clients" className="inline-flex items-center gap-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors mb-6">
+          <ArrowLeft className="w-4 h-4" />Volver a clientes
         </Link>
 
         {/* Step Progress */}
@@ -216,73 +342,241 @@ export default function NewClientWizard() {
             const isDone = step > s.id;
             return (
               <div key={s.id} className="flex items-center">
-                <div
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap",
-                    isActive && "bg-brand-purple/10 text-brand-purple border border-brand-purple/30",
-                    isDone && "bg-success/10 text-success",
-                    !isActive && !isDone && "text-[var(--muted-foreground)]"
-                  )}
-                >
+                <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap",
+                  isActive && "bg-brand-purple/10 text-brand-purple border border-brand-purple/30",
+                  isDone && "bg-success/10 text-success",
+                  !isActive && !isDone && "text-[var(--muted-foreground)]"
+                )}>
                   {isDone ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">{s.label}</span>
                 </div>
-                {i < STEPS.length - 1 && (
-                  <div className={cn("w-4 h-px mx-1", isDone ? "bg-success" : "bg-[var(--border)]")} />
-                )}
+                {i < STEPS.length - 1 && <div className={cn("w-4 h-px mx-1", isDone ? "bg-success" : "bg-[var(--border)]")} />}
               </div>
             );
           })}
         </div>
 
-        {/* Error display */}
         {error && (
           <div className="flex items-start gap-2 p-3 mb-6 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <div>{error}</div>
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /><div>{error}</div>
           </div>
         )}
 
-        {/* ══════ STEP 1: Client Data ══════ */}
+        {/* ══════ STEP 1: Client Data + Agents ══════ */}
         {step === 1 && (
-          <div className="card animate-fade-in">
-            <h3 className="text-lg font-semibold mb-1">Datos del cliente</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mb-6">Información básica de la empresa o persona</p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Email *</label>
-                <input type="email" className="input-field" placeholder="cliente@empresa.com" value={clientData.email} onChange={e => setClientData(p => ({ ...p, email: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-4 animate-fade-in">
+            {/* Basic info */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-1">Datos del cliente</h3>
+              <p className="text-sm text-[var(--muted-foreground)] mb-4">Información básica de la empresa o persona</p>
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Nombre de contacto</label>
-                  <input type="text" className="input-field" placeholder="Juan García" value={clientData.nombre} onChange={e => setClientData(p => ({ ...p, nombre: e.target.value }))} />
+                  <label className="block text-sm font-medium mb-1.5">Email *</label>
+                  <input type="email" className="input-field" placeholder="cliente@empresa.com" value={clientData.email} onChange={e => setClientData(p => ({ ...p, email: e.target.value }))} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Empresa</label>
-                  <input type="text" className="input-field" placeholder="Peluquería Ana" value={clientData.empresa} onChange={e => setClientData(p => ({ ...p, empresa: e.target.value }))} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Nombre de contacto</label>
+                    <input type="text" className="input-field" placeholder="Juan García" value={clientData.nombre} onChange={e => setClientData(p => ({ ...p, nombre: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Empresa</label>
+                    <input type="text" className="input-field" placeholder="Peluquería Ana" value={clientData.empresa} onChange={e => setClientData(p => ({ ...p, empresa: e.target.value }))} />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Plan</label>
-                  <select className="input-field" value={clientData.plan} onChange={e => setClientData(p => ({ ...p, plan: e.target.value }))}>
-                    <option value="basico">Básico</option>
-                    <option value="pro">Pro</option>
-                    <option value="enterprise">Enterprise</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">€/hora (ahorro)</label>
-                  <input type="number" className="input-field" value={clientData.coste_hora} onChange={e => setClientData(p => ({ ...p, coste_hora: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Min/conversación</label>
-                  <input type="number" className="input-field" value={clientData.minutos_por_conv} onChange={e => setClientData(p => ({ ...p, minutos_por_conv: e.target.value }))} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">€/hora (cálculo ahorro)</label>
+                    <input type="number" className="input-field" value={clientData.coste_hora} onChange={e => setClientData(p => ({ ...p, coste_hora: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Min/conversación</label>
+                    <input type="number" className="input-field" value={clientData.minutos_por_conv} onChange={e => setClientData(p => ({ ...p, minutos_por_conv: e.target.value }))} />
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Agent Selection */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-brand-purple" />
+                    Agentes contratados
+                  </h3>
+                  <p className="text-sm text-[var(--muted-foreground)]">Selecciona los agentes que contrata este cliente</p>
+                </div>
+              </div>
+
+              {loadingAgents ? (
+                <Loader2 className="w-6 h-6 animate-spin text-brand-purple mx-auto my-4" />
+              ) : allAgentes.length === 0 ? (
+                <div className="text-center py-6 border border-dashed border-[var(--border)] rounded-lg">
+                  <Zap className="w-8 h-8 text-[var(--muted-foreground)] mx-auto mb-2" />
+                  <p className="text-sm text-[var(--muted-foreground)]">No hay agentes en el catálogo</p>
+                  <Link href="/admin/agentes" className="text-xs text-brand-purple mt-1 inline-block">Crear agentes primero →</Link>
+                </div>
+              ) : (
+                <>
+                  {/* Available agents to add */}
+                  {availableAgents.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-medium text-[var(--muted-foreground)] mb-2">Añadir agente:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {availableAgents.map(agente => (
+                          <button key={agente.id} onClick={() => addAgent(agente)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] hover:border-brand-purple/50 hover:bg-brand-purple/5 transition-all text-sm">
+                            <Plus className="w-3.5 h-3.5 text-brand-purple" />
+                            <span>{agente.nombre}</span>
+                            <span className="text-xs text-[var(--muted-foreground)]">{agente.precio}€{periodicidadLabel(agente.periodicidad)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Selected agents */}
+                  {selectedAgents.length > 0 && (
+                    <div className="space-y-3">
+                      {selectedAgents.map(agent => {
+                        const price = agent.precio_custom ? parseFloat(agent.precio_custom) : agent.precio_base;
+                        const discount = parseFloat(agent.descuento) || 0;
+                        const finalPrice = price * (1 - discount / 100);
+
+                        return (
+                          <div key={agent.agente_id} className="p-4 rounded-lg border border-brand-purple/20 bg-brand-purple/5">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-brand-purple" />
+                                <span className="font-semibold text-sm">{agent.nombre}</span>
+                                <span className="text-xs text-[var(--muted-foreground)]">({agent.precio_base}€{periodicidadLabel(agent.periodicidad)})</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-brand-purple">{finalPrice.toFixed(2)}€{periodicidadLabel(agent.periodicidad)}</span>
+                                <button onClick={() => removeAgent(agent.agente_id)} className="p-1 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-medium text-[var(--muted-foreground)] mb-1">Precio custom (€)</label>
+                                <input type="number" className="input-field text-xs py-1.5" placeholder={`Catálogo: ${agent.precio_base}€`}
+                                  value={agent.precio_custom} onChange={e => updateAgent(agent.agente_id, "precio_custom", e.target.value)} />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-[var(--muted-foreground)] mb-1">Descuento (%)</label>
+                                <input type="number" className="input-field text-xs py-1.5" placeholder="0" min="0" max="100"
+                                  value={agent.descuento} onChange={e => updateAgent(agent.agente_id, "descuento", e.target.value)} />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-[var(--muted-foreground)] mb-1">Notas</label>
+                                <input type="text" className="input-field text-xs py-1.5" placeholder="Ej: Dto 3 meses"
+                                  value={agent.notas} onChange={e => updateAgent(agent.agente_id, "notas", e.target.value)} />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Extra Concepts */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-warning" />
+                    Conceptos extra (opcional)
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">Instalación, configuración inicial, etc.</p>
+                </div>
+                <button onClick={addExtraConcept} className="btn-ghost text-xs flex items-center gap-1">
+                  <Plus className="w-3 h-3" />Añadir concepto
+                </button>
+              </div>
+
+              {extraConcepts.length === 0 ? (
+                <p className="text-xs text-[var(--muted-foreground)] text-center py-3">Sin conceptos extra</p>
+              ) : (
+                <div className="space-y-3">
+                  {extraConcepts.map((ec, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-[var(--border)]">
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-medium text-[var(--muted-foreground)] mb-1">Concepto *</label>
+                          <input className="input-field text-xs py-1.5" placeholder="Instalación HERMES"
+                            value={ec.concepto} onChange={e => updateExtraConcept(i, "concepto", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-[var(--muted-foreground)] mb-1">Importe (€) *</label>
+                          <input type="number" className="input-field text-xs py-1.5" placeholder="150"
+                            value={ec.importe} onChange={e => updateExtraConcept(i, "importe", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-[var(--muted-foreground)] mb-1">Notas</label>
+                          <input className="input-field text-xs py-1.5" placeholder="Pago único primer mes"
+                            value={ec.notas} onChange={e => updateExtraConcept(i, "notas", e.target.value)} />
+                        </div>
+                      </div>
+                      <button onClick={() => removeExtraConcept(i)} className="p-1.5 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger mt-4">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Total Summary */}
+            {(selectedAgents.length > 0 || extraConcepts.length > 0) && (
+              <div className="card border-brand-purple/20">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-brand-purple" />
+                  Resumen económico
+                </h3>
+                <div className="space-y-2 text-sm">
+                  {selectedAgents.map(agent => {
+                    const price = agent.precio_custom ? parseFloat(agent.precio_custom) : agent.precio_base;
+                    const discount = parseFloat(agent.descuento) || 0;
+                    const final1 = price * (1 - discount / 100);
+                    return (
+                      <div key={agent.agente_id} className="flex justify-between">
+                        <span className="text-[var(--muted-foreground)]">
+                          {agent.nombre}
+                          {discount > 0 && <span className="text-success text-xs ml-1">(-{discount}%)</span>}
+                        </span>
+                        <span className="font-medium">{final1.toFixed(2)}€{periodicidadLabel(agent.periodicidad)}</span>
+                      </div>
+                    );
+                  })}
+                  {extraConcepts.filter(ec => ec.importe).map((ec, i) => (
+                    <div key={`ec-${i}`} className="flex justify-between">
+                      <span className="text-[var(--muted-foreground)]">{ec.concepto || "Concepto extra"} <span className="text-xs">(único)</span></span>
+                      <span className="font-medium">{parseFloat(ec.importe).toFixed(2)}€</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-[var(--border)] pt-2 mt-2">
+                    {totals.monthly > 0 && (
+                      <div className="flex justify-between font-bold">
+                        <span>Total mensual recurrente</span>
+                        <span className="text-brand-purple">{totals.monthly.toFixed(2)}€/mes</span>
+                      </div>
+                    )}
+                    {totals.oneTime > 0 && (
+                      <div className="flex justify-between font-bold">
+                        <span>Pagos únicos</span>
+                        <span className="text-warning">{totals.oneTime.toFixed(2)}€</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -291,10 +585,8 @@ export default function NewClientWizard() {
           <div className="card animate-fade-in">
             <h3 className="text-lg font-semibold mb-1">Credenciales de Supabase</h3>
             <p className="text-sm text-[var(--muted-foreground)] mb-6">
-              Introduce la URL y la Service Role Key del proyecto Supabase del cliente.
-              La key se cifrará con AES-256 antes de guardarse.
+              Introduce la URL y la Service Role Key del proyecto Supabase del cliente. La key se cifrará con AES-256.
             </p>
-
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1.5">URL del proyecto Supabase</label>
@@ -303,9 +595,7 @@ export default function NewClientWizard() {
               <div>
                 <label className="block text-sm font-medium mb-1.5">Service Role Key (secret)</label>
                 <input type="password" className="input-field font-mono text-xs" placeholder="eyJhbGciOiJIUzI1NiIs..." value={credentials.supabase_key} onChange={e => setCredentials(p => ({ ...p, supabase_key: e.target.value }))} />
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                  Se encuentra en Settings → API → service_role (secret) en el dashboard de Supabase
-                </p>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Settings → API → service_role (secret)</p>
               </div>
             </div>
           </div>
@@ -318,9 +608,7 @@ export default function NewClientWizard() {
               <div>
                 <h3 className="text-lg font-semibold mb-1">Tablas detectadas</h3>
                 <p className="text-sm text-[var(--muted-foreground)]">
-                  {tables.length > 0
-                    ? `Se encontraron ${tables.length} tablas en el Supabase del cliente`
-                    : "Pulsa el botón para escanear las tablas del cliente"}
+                  {tables.length > 0 ? `${tables.length} tablas encontradas` : "Pulsa escanear para detectar tablas"}
                 </p>
               </div>
               <button onClick={detectTables} disabled={loading} className="btn-primary flex items-center gap-2">
@@ -328,25 +616,19 @@ export default function NewClientWizard() {
                 {loading ? "Escaneando..." : tables.length > 0 ? "Re-escanear" : "Escanear tablas"}
               </button>
             </div>
-
             {tables.length > 0 && (
               <div className="space-y-2">
                 {tables.map(table => (
                   <div key={table.name} className="border border-[var(--border)] rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setExpandedTable(expandedTable === table.name ? null : table.name)}
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--muted)]/50 transition-colors"
-                    >
+                    <button onClick={() => setExpandedTable(expandedTable === table.name ? null : table.name)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--muted)]/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <Database className="w-4 h-4 text-brand-purple" />
                         <span className="font-mono text-sm font-medium">{table.name}</span>
-                        <span className="text-xs text-[var(--muted-foreground)]">
-                          {table.columns.length} columnas · {table.row_count} filas
-                        </span>
+                        <span className="text-xs text-[var(--muted-foreground)]">{table.columns.length} cols · {table.row_count} filas</span>
                       </div>
                       {expandedTable === table.name ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
-
                     {expandedTable === table.name && (
                       <div className="px-4 pb-3 border-t border-[var(--border)]">
                         <div className="mt-3 space-y-1">
@@ -354,18 +636,15 @@ export default function NewClientWizard() {
                             <div key={col.column_name} className="flex items-center gap-3 text-xs py-1">
                               <span className="font-mono text-brand-purple-light w-40 truncate">{col.column_name}</span>
                               <span className="text-[var(--muted-foreground)] w-24">{col.data_type}</span>
-                              <span className="text-[var(--muted-foreground)]">{col.is_nullable === "YES" ? "nullable" : "required"}</span>
                             </div>
                           ))}
                         </div>
                         {table.preview.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-[var(--border)]">
-                            <p className="text-xs font-medium text-[var(--muted-foreground)] mb-2">Preview ({table.preview.length} filas):</p>
-                            <div className="overflow-x-auto">
-                              <pre className="text-xs text-[var(--muted-foreground)] bg-[var(--muted)] p-2 rounded">
-                                {JSON.stringify(table.preview[0], null, 2)}
-                              </pre>
-                            </div>
+                            <p className="text-xs font-medium text-[var(--muted-foreground)] mb-2">Preview:</p>
+                            <pre className="text-xs text-[var(--muted-foreground)] bg-[var(--muted)] p-2 rounded overflow-x-auto">
+                              {JSON.stringify(table.preview[0], null, 2)}
+                            </pre>
                           </div>
                         )}
                       </div>
@@ -381,10 +660,7 @@ export default function NewClientWizard() {
         {step === 4 && (
           <div className="card animate-fade-in">
             <h3 className="text-lg font-semibold mb-1">Asignar módulos</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mb-6">
-              Selecciona las tablas que quieres mostrar en el portal y asígnales un tipo de módulo
-            </p>
-
+            <p className="text-sm text-[var(--muted-foreground)] mb-6">Selecciona las tablas y asígnales un tipo</p>
             <div className="space-y-3">
               {tables.map(table => (
                 <div key={table.name} className="border border-[var(--border)] rounded-lg p-4">
@@ -393,25 +669,16 @@ export default function NewClientWizard() {
                     <span className="font-mono text-sm font-medium">{table.name}</span>
                     <span className="text-xs text-[var(--muted-foreground)]">{table.row_count} filas</span>
                   </div>
-
                   <div className="flex flex-wrap gap-2">
                     {MODULE_TYPES.map(mt => {
                       const Icon = mt.icon;
                       const isSelected = selectedTables[table.name] === mt.id;
                       return (
-                        <button
-                          key={mt.id}
-                          onClick={() => toggleTable(table.name, mt.id)}
-                          className={cn(
-                            "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-all",
-                            isSelected
-                              ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-                              : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-brand-purple/50"
-                          )}
-                        >
-                          <Icon className="w-3.5 h-3.5" />
-                          {mt.label}
-                          {isSelected && <Check className="w-3 h-3" />}
+                        <button key={mt.id} onClick={() => toggleTable(table.name, mt.id)}
+                          className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-all",
+                            isSelected ? "border-brand-purple bg-brand-purple/10 text-brand-purple" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-brand-purple/50"
+                          )}>
+                          <Icon className="w-3.5 h-3.5" />{mt.label}{isSelected && <Check className="w-3 h-3" />}
                         </button>
                       );
                     })}
@@ -425,38 +692,21 @@ export default function NewClientWizard() {
         {/* ══════ STEP 5: Configure Modules ══════ */}
         {step === 5 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-1">Configurar módulos</h3>
-              <p className="text-sm text-[var(--muted-foreground)]">
-                Ajusta el nombre, mapeo de campos y permisos de cada módulo
-              </p>
-            </div>
-
+            <div className="card"><h3 className="text-lg font-semibold mb-1">Configurar módulos</h3><p className="text-sm text-[var(--muted-foreground)]">Ajusta nombre, mapeo y permisos</p></div>
             {Object.entries(moduleConfigs).map(([tableName, config]) => {
               const table = tables.find(t => t.name === tableName);
               const columns = table?.columns || [];
               return (
                 <div key={tableName} className="card">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 rounded-lg bg-brand-purple/10">
-                      <Database className="w-4 h-4 text-brand-purple" />
-                    </div>
-                    <div>
-                      <span className="font-mono text-sm">{tableName}</span>
-                      <span className="text-xs text-[var(--muted-foreground)] ml-2">→ {config.tipo}</span>
-                    </div>
+                    <div className="p-2 rounded-lg bg-brand-purple/10"><Database className="w-4 h-4 text-brand-purple" /></div>
+                    <div><span className="font-mono text-sm">{tableName}</span><span className="text-xs text-[var(--muted-foreground)] ml-2">→ {config.tipo}</span></div>
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-xs font-medium mb-1">Nombre visible</label>
-                      <input
-                        type="text" className="input-field text-sm"
-                        value={config.nombre_display}
-                        onChange={e => setModuleConfigs(p => ({
-                          ...p, [tableName]: { ...p[tableName], nombre_display: e.target.value }
-                        }))}
-                      />
+                      <input type="text" className="input-field text-sm" value={config.nombre_display}
+                        onChange={e => setModuleConfigs(p => ({ ...p, [tableName]: { ...p[tableName], nombre_display: e.target.value } }))} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1">Tipo de vista</label>
@@ -464,28 +714,15 @@ export default function NewClientWizard() {
                         {VISTA_TYPES.map(vt => {
                           const VIcon = vt.icon;
                           return (
-                            <button
-                              key={vt.id}
-                              onClick={() => setModuleConfigs(p => ({
-                                ...p, [tableName]: { ...p[tableName], config_visual: { tipo_vista: vt.id } }
-                              }))}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border transition-all",
-                                config.config_visual.tipo_vista === vt.id
-                                  ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-                                  : "border-[var(--border)] text-[var(--muted-foreground)]"
-                              )}
-                            >
-                              <VIcon className="w-3.5 h-3.5" />
-                              {vt.label}
-                            </button>
+                            <button key={vt.id} onClick={() => setModuleConfigs(p => ({ ...p, [tableName]: { ...p[tableName], config_visual: { tipo_vista: vt.id } } }))}
+                              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs border transition-all",
+                                config.config_visual.tipo_vista === vt.id ? "border-brand-purple bg-brand-purple/10 text-brand-purple" : "border-[var(--border)] text-[var(--muted-foreground)]"
+                              )}><VIcon className="w-3.5 h-3.5" />{vt.label}</button>
                           );
                         })}
                       </div>
                     </div>
                   </div>
-
-                  {/* Field mapping */}
                   {config.tipo !== "generico" && (
                     <div className="mb-4">
                       <label className="block text-xs font-medium mb-2">Mapeo de campos</label>
@@ -493,44 +730,22 @@ export default function NewClientWizard() {
                         {getRequiredFields(config.tipo).map(field => (
                           <div key={field.key} className="flex items-center gap-2">
                             <span className="text-xs text-[var(--muted-foreground)] w-24 flex-shrink-0">{field.label}:</span>
-                            <select
-                              className="input-field text-xs py-1.5"
-                              value={config.mapeo_campos[field.key] || ""}
-                              onChange={e => setModuleConfigs(p => ({
-                                ...p, [tableName]: {
-                                  ...p[tableName],
-                                  mapeo_campos: { ...p[tableName].mapeo_campos, [field.key]: e.target.value }
-                                }
-                              }))}
-                            >
+                            <select className="input-field text-xs py-1.5" value={config.mapeo_campos[field.key] || ""}
+                              onChange={e => setModuleConfigs(p => ({ ...p, [tableName]: { ...p[tableName], mapeo_campos: { ...p[tableName].mapeo_campos, [field.key]: e.target.value } } }))}>
                               <option value="">— Sin asignar —</option>
-                              {columns.map(col => (
-                                <option key={col.column_name} value={col.column_name}>{col.column_name}</option>
-                              ))}
+                              {columns.map(col => <option key={col.column_name} value={col.column_name}>{col.column_name}</option>)}
                             </select>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* Permissions */}
                   <div className="flex flex-wrap gap-4 pt-3 border-t border-[var(--border)]">
-                    {[
-                      { key: "permite_crear", label: "Puede crear" },
-                      { key: "permite_editar", label: "Puede editar" },
-                      { key: "permite_eliminar", label: "Puede eliminar" },
-                    ].map(perm => (
+                    {[{ key: "permite_crear", label: "Puede crear" }, { key: "permite_editar", label: "Puede editar" }, { key: "permite_eliminar", label: "Puede eliminar" }].map(perm => (
                       <label key={perm.key} className="flex items-center gap-2 text-xs cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={(config as any)[perm.key]}
-                          onChange={e => setModuleConfigs(p => ({
-                            ...p, [tableName]: { ...p[tableName], [perm.key]: e.target.checked }
-                          }))}
-                          className="rounded border-[var(--border)]"
-                        />
-                        {perm.label}
+                        <input type="checkbox" checked={(config as any)[perm.key]}
+                          onChange={e => setModuleConfigs(p => ({ ...p, [tableName]: { ...p[tableName], [perm.key]: e.target.checked } }))}
+                          className="rounded border-[var(--border)]" />{perm.label}
                       </label>
                     ))}
                   </div>
@@ -544,29 +759,42 @@ export default function NewClientWizard() {
         {step === 6 && (
           <div className="card animate-fade-in">
             <h3 className="text-lg font-semibold mb-1">Vista previa</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mb-6">
-              Revisa la configuración antes de crear el cliente
-            </p>
-
+            <p className="text-sm text-[var(--muted-foreground)] mb-6">Revisa todo antes de crear el cliente</p>
             <div className="space-y-4">
-              {/* Client info */}
               <div className="p-4 rounded-lg bg-[var(--muted)]">
                 <h4 className="text-sm font-semibold mb-2">Datos del cliente</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-[var(--muted-foreground)]">Email:</span>
-                  <span>{clientData.email}</span>
-                  <span className="text-[var(--muted-foreground)]">Nombre:</span>
-                  <span>{clientData.nombre || "—"}</span>
-                  <span className="text-[var(--muted-foreground)]">Empresa:</span>
-                  <span>{clientData.empresa || "—"}</span>
-                  <span className="text-[var(--muted-foreground)]">Plan:</span>
-                  <span className="capitalize">{clientData.plan}</span>
-                  <span className="text-[var(--muted-foreground)]">Supabase:</span>
-                  <span className="font-mono text-xs truncate">{credentials.supabase_url}</span>
+                  <span className="text-[var(--muted-foreground)]">Email:</span><span>{clientData.email}</span>
+                  <span className="text-[var(--muted-foreground)]">Nombre:</span><span>{clientData.nombre || "—"}</span>
+                  <span className="text-[var(--muted-foreground)]">Empresa:</span><span>{clientData.empresa || "—"}</span>
+                  <span className="text-[var(--muted-foreground)]">Supabase:</span><span className="font-mono text-xs truncate">{credentials.supabase_url}</span>
                 </div>
               </div>
 
-              {/* Modules */}
+              {selectedAgents.length > 0 && (
+                <div className="p-4 rounded-lg bg-[var(--muted)]">
+                  <h4 className="text-sm font-semibold mb-2">Agentes contratados ({selectedAgents.length})</h4>
+                  <div className="space-y-1">
+                    {selectedAgents.map(agent => {
+                      const price = agent.precio_custom ? parseFloat(agent.precio_custom) : agent.precio_base;
+                      const discount = parseFloat(agent.descuento) || 0;
+                      const final1 = price * (1 - discount / 100);
+                      return (
+                        <div key={agent.agente_id} className="flex justify-between text-sm">
+                          <span>{agent.nombre} {discount > 0 && <span className="text-success text-xs">(-{discount}%)</span>}</span>
+                          <span className="font-medium">{final1.toFixed(2)}€{periodicidadLabel(agent.periodicidad)}</span>
+                        </div>
+                      );
+                    })}
+                    {totals.monthly > 0 && (
+                      <div className="flex justify-between text-sm font-bold pt-2 border-t border-[var(--border)]">
+                        <span>Total mensual</span><span className="text-brand-purple">{totals.monthly.toFixed(2)}€/mes</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 rounded-lg bg-[var(--muted)]">
                 <h4 className="text-sm font-semibold mb-2">Módulos ({Object.keys(moduleConfigs).length})</h4>
                 <div className="space-y-2">
@@ -574,8 +802,7 @@ export default function NewClientWizard() {
                     <div key={tableName} className="flex items-center gap-3 text-sm">
                       <span className="w-2 h-2 rounded-full bg-brand-purple" />
                       <span className="font-medium">{config.nombre_display}</span>
-                      <span className="text-xs text-[var(--muted-foreground)]">({config.tipo})</span>
-                      <span className="text-xs text-[var(--muted-foreground)]">← {tableName}</span>
+                      <span className="text-xs text-[var(--muted-foreground)]">({config.tipo}) ← {tableName}</span>
                     </div>
                   ))}
                 </div>
@@ -591,65 +818,41 @@ export default function NewClientWizard() {
               <Check className="w-8 h-8 text-success" />
             </div>
             <h3 className="text-xl font-bold mb-2">¡Cliente creado con éxito!</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mb-6">
-              Se ha creado la cuenta y configurado los módulos.
-            </p>
+            <p className="text-sm text-[var(--muted-foreground)] mb-6">Cuenta creada, módulos configurados y agentes asignados.</p>
 
             <div className="card max-w-sm mx-auto text-left mb-6">
               <h4 className="text-sm font-semibold mb-2">Credenciales del cliente</h4>
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Email:</span>
-                  <span className="font-mono">{result.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Contraseña temporal:</span>
-                  <span className="font-mono text-brand-purple">{result.temp_password}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-[var(--muted-foreground)]">Email:</span><span className="font-mono">{result.email}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--muted-foreground)]">Contraseña:</span><span className="font-mono text-brand-purple">{result.temp_password}</span></div>
+                {result.totals?.monthly > 0 && (
+                  <div className="flex justify-between pt-2 border-t border-[var(--border)]"><span className="text-[var(--muted-foreground)]">Mensualidad:</span><span className="font-bold">{result.totals.monthly.toFixed(2)}€/mes</span></div>
+                )}
               </div>
-              <p className="text-xs text-warning mt-3">
-                ⚠ Guarda esta contraseña, no se puede recuperar después.
-              </p>
+              <p className="text-xs text-warning mt-3">⚠ Guarda esta contraseña, no se puede recuperar después.</p>
             </div>
 
             <div className="flex items-center justify-center gap-3">
-              <Link href="/admin/clients" className="btn-secondary">
-                Ver todos los clientes
-              </Link>
-              <button onClick={() => { setStep(1); setResult(null); resetForm(); }} className="btn-primary">
-                Crear otro cliente
-              </button>
+              <Link href="/admin/clients" className="btn-secondary">Ver todos los clientes</Link>
+              <button onClick={() => { setStep(1); setResult(null); resetForm(); }} className="btn-primary">Crear otro cliente</button>
             </div>
           </div>
         )}
 
-        {/* ══════ Navigation Buttons ══════ */}
+        {/* ══════ Navigation ══════ */}
         {step < 7 && (
           <div className="flex items-center justify-between mt-6">
-            <button
-              onClick={() => { setStep(s => s - 1); setError(null); }}
-              disabled={step === 1}
-              className="btn-ghost flex items-center gap-2 disabled:opacity-30"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Anterior
+            <button onClick={() => { setStep(s => s - 1); setError(null); }} disabled={step === 1} className="btn-ghost flex items-center gap-2 disabled:opacity-30">
+              <ArrowLeft className="w-4 h-4" />Anterior
             </button>
-
-            {step === 3 && tables.length === 0 ? (
-              <div />
-            ) : step === 6 ? (
+            {step === 3 && tables.length === 0 ? <div /> : step === 6 ? (
               <button onClick={createClient} disabled={loading} className="btn-primary flex items-center gap-2">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
                 {loading ? "Creando..." : "Crear cliente"}
               </button>
             ) : (
-              <button
-                onClick={() => { setStep(s => s + 1); setError(null); }}
-                disabled={!canGoNext()}
-                className="btn-primary flex items-center gap-2 disabled:opacity-50"
-              >
-                Siguiente
-                <ArrowRight className="w-4 h-4" />
+              <button onClick={() => { setStep(s => s + 1); setError(null); }} disabled={!canGoNext()} className="btn-primary flex items-center gap-2 disabled:opacity-50">
+                Siguiente<ArrowRight className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -659,103 +862,61 @@ export default function NewClientWizard() {
   );
 
   function resetForm() {
-    setClientData({ email: "", nombre: "", empresa: "", plan: "basico", coste_hora: "15", minutos_por_conv: "5" });
+    setClientData({ email: "", nombre: "", empresa: "", coste_hora: "15", minutos_por_conv: "5" });
     setCredentials({ supabase_url: "", supabase_key: "" });
-    setTables([]);
-    setSelectedTables({});
-    setModuleConfigs({});
-    setResult(null);
-    setError(null);
+    setTables([]); setSelectedTables({}); setModuleConfigs({});
+    setSelectedAgents([]); setExtraConcepts([]); setResult(null); setError(null);
   }
 }
 
-// ── Helper Functions ──
-
+// ── Helpers ──
 function autoMapColumns(columns: any[], moduleType: string): Record<string, string> {
   const map: Record<string, string> = {};
   const colNames = columns.map((c: any) => c.column_name.toLowerCase());
-
   if (moduleType === "leads") {
-    map.nombre = findColumn(colNames, ["nombre", "name", "paciente_nombre", "cliente_nombre"]) || "";
-    map.telefono = findColumn(colNames, ["telefono", "phone", "tel", "paciente_telefono"]) || "";
-    map.email = findColumn(colNames, ["email", "correo", "mail"]) || "";
-    map.estado = findColumn(colNames, ["estado", "status", "state"]) || "";
-    map.fecha = findColumn(colNames, ["fecha_registro", "created_at", "fecha", "date"]) || "";
-    map.notas = findColumn(colNames, ["notas", "notes", "nota", "observaciones"]) || "";
-  } else if (moduleType === "citas") {
-    map.nombre_paciente = findColumn(colNames, ["paciente_nombre", "nombre", "name", "cliente"]) || "";
-    map.telefono = findColumn(colNames, ["paciente_telefono", "telefono", "phone"]) || "";
-    map.fecha = findColumn(colNames, ["fecha_cita", "fecha", "date"]) || "";
-    map.hora = findColumn(colNames, ["hora_cita", "hora", "time"]) || "";
+    map.nombre = findColumn(colNames, ["nombre", "name", "paciente_nombre"]) || "";
+    map.telefono = findColumn(colNames, ["telefono", "phone", "tel"]) || "";
+    map.email = findColumn(colNames, ["email", "correo"]) || "";
     map.estado = findColumn(colNames, ["estado", "status"]) || "";
-    map.tipo = findColumn(colNames, ["tipo_cita", "tipo", "type"]) || "";
+    map.fecha = findColumn(colNames, ["fecha_registro", "created_at", "fecha"]) || "";
+    map.notas = findColumn(colNames, ["notas", "notes"]) || "";
+  } else if (moduleType === "citas") {
+    map.nombre_paciente = findColumn(colNames, ["paciente_nombre", "nombre"]) || "";
+    map.telefono = findColumn(colNames, ["paciente_telefono", "telefono"]) || "";
+    map.fecha = findColumn(colNames, ["fecha_cita", "fecha"]) || "";
+    map.hora = findColumn(colNames, ["hora_cita", "hora"]) || "";
+    map.estado = findColumn(colNames, ["estado", "status"]) || "";
+    map.tipo = findColumn(colNames, ["tipo_cita", "tipo"]) || "";
     map.notas = findColumn(colNames, ["notas", "notes"]) || "";
   } else if (moduleType === "conversaciones") {
-    map.mensaje = findColumn(colNames, ["mensaje", "message", "text", "contenido"]) || "";
-    map.rol = findColumn(colNames, ["rol", "role", "sender"]) || "";
+    map.mensaje = findColumn(colNames, ["mensaje", "message"]) || "";
+    map.rol = findColumn(colNames, ["rol", "role"]) || "";
     map.telefono = findColumn(colNames, ["telefono", "phone"]) || "";
-    map.nombre_cliente = findColumn(colNames, ["nombre_cliente", "nombre", "name"]) || "";
-    map.session_id = findColumn(colNames, ["session_id", "conversation_id", "chat_id"]) || "";
-    map.created_at = findColumn(colNames, ["created_at", "fecha", "timestamp"]) || "";
+    map.nombre_cliente = findColumn(colNames, ["nombre_cliente", "nombre"]) || "";
+    map.session_id = findColumn(colNames, ["session_id", "conversation_id"]) || "";
+    map.created_at = findColumn(colNames, ["created_at", "fecha"]) || "";
   }
-
   return map;
 }
 
 function findColumn(colNames: string[], options: string[]): string | undefined {
-  for (const opt of options) {
-    const found = colNames.find(c => c === opt || c.includes(opt));
-    if (found) return found;
-  }
+  for (const opt of options) { const found = colNames.find(c => c === opt || c.includes(opt)); if (found) return found; }
   return undefined;
 }
 
 function formatTableName(name: string): string {
-  return name
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, l => l.toUpperCase());
+  return name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 }
 
 function getModuleIcon(tipo: string): string {
-  switch (tipo) {
-    case "leads": return "Users";
-    case "citas": return "Calendar";
-    case "conversaciones": return "MessageSquare";
-    default: return "LayoutGrid";
-  }
+  switch (tipo) { case "leads": return "Users"; case "citas": return "Calendar"; case "conversaciones": return "MessageSquare"; default: return "LayoutGrid"; }
 }
 
 function getRequiredFields(tipo: string): { key: string; label: string }[] {
   switch (tipo) {
-    case "leads":
-      return [
-        { key: "nombre", label: "Nombre" },
-        { key: "telefono", label: "Teléfono" },
-        { key: "email", label: "Email" },
-        { key: "estado", label: "Estado" },
-        { key: "fecha", label: "Fecha" },
-        { key: "notas", label: "Notas" },
-      ];
-    case "citas":
-      return [
-        { key: "nombre_paciente", label: "Nombre" },
-        { key: "telefono", label: "Teléfono" },
-        { key: "fecha", label: "Fecha" },
-        { key: "hora", label: "Hora" },
-        { key: "estado", label: "Estado" },
-        { key: "tipo", label: "Tipo" },
-        { key: "notas", label: "Notas" },
-      ];
-    case "conversaciones":
-      return [
-        { key: "mensaje", label: "Mensaje" },
-        { key: "rol", label: "Rol" },
-        { key: "telefono", label: "Teléfono" },
-        { key: "nombre_cliente", label: "Nombre" },
-        { key: "session_id", label: "Session ID" },
-        { key: "created_at", label: "Fecha" },
-      ];
-    default:
-      return [];
+    case "leads": return [{ key: "nombre", label: "Nombre" }, { key: "telefono", label: "Teléfono" }, { key: "email", label: "Email" }, { key: "estado", label: "Estado" }, { key: "fecha", label: "Fecha" }, { key: "notas", label: "Notas" }];
+    case "citas": return [{ key: "nombre_paciente", label: "Nombre" }, { key: "telefono", label: "Teléfono" }, { key: "fecha", label: "Fecha" }, { key: "hora", label: "Hora" }, { key: "estado", label: "Estado" }, { key: "tipo", label: "Tipo" }, { key: "notas", label: "Notas" }];
+    case "conversaciones": return [{ key: "mensaje", label: "Mensaje" }, { key: "rol", label: "Rol" }, { key: "telefono", label: "Teléfono" }, { key: "nombre_cliente", label: "Nombre" }, { key: "session_id", label: "Session ID" }, { key: "created_at", label: "Fecha" }];
+    default: return [];
   }
 }
