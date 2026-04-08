@@ -9,7 +9,7 @@ import { CalendarView } from "@/components/portal/CalendarView";
 import {
   Search, Loader2, ChevronLeft, ChevronRight, Trash2,
   Plus, X, Eye, AlertCircle, RefreshCw, Table2, Kanban,
-  CalendarDays, Edit
+  CalendarDays, Edit, Download
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -244,6 +244,10 @@ export default function ModulePage() {
           <button onClick={() => { fetchData(); fetchData(true); }} className="btn-ghost p-2.5" title="Refrescar">
             <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           </button>
+
+          <a href={`/api/portal/export?module_id=${moduleId}`} download className="btn-ghost p-2.5" title="Exportar CSV">
+            <Download className="w-4 h-4" />
+          </a>
 
           {modulo?.permite_crear && (
             <button onClick={openCreate} className="btn-primary flex items-center gap-2">
