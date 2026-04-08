@@ -343,7 +343,7 @@ export default function ClientDetailPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Módulos configurados ({modules.length})</h3>
-            <span className="text-xs text-[var(--muted-foreground)] cursor-default">Re-configurar módulos (próximamente)</span>
+            <span></span>
           </div>
 
           {modules.length === 0 ? (

@@ -73,13 +73,15 @@ export async function POST(request: Request) {
       const precioFinal = precioCustom !== null ? precioCustom : precioBase;
       const precioConDescuento = precioFinal * (1 - descuento / 100);
 
+      console.log("AUTO-INVOICE: Creating invoice for", data.portal_agentes.nombre, "amount:", precioConDescuento);
+
       if (precioConDescuento > 0) {
         const now = new Date();
         const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
         const vencimiento = new Date(now);
         vencimiento.setDate(vencimiento.getDate() + 30);
 
-        await supabase.from("portal_facturacion_admin").insert({
+        const { error: invoiceError } = await supabase.from("portal_facturacion_admin").insert({
           cliente_id: body.cliente_id,
           concepto: `${data.portal_agentes.nombre} — ${mesActual}`,
           importe: precioConDescuento,
@@ -88,7 +90,15 @@ export async function POST(request: Request) {
           fecha_vencimiento: vencimiento.toISOString().split("T")[0],
           notas: descuento > 0 ? `Dto ${descuento}% aplicado` : null,
         });
+
+        if (invoiceError) {
+          console.error("AUTO-INVOICE ERROR:", invoiceError);
+        } else {
+          console.log("AUTO-INVOICE: Created successfully");
+        }
       }
+    } else {
+      console.log("AUTO-INVOICE: No portal_agentes data found in response");
     }
 
     return NextResponse.json(data);
