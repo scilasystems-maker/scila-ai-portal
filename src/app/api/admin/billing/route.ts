@@ -35,8 +35,8 @@ export async function GET(request: Request) {
     for (const sub of (subscriptions || [])) {
       const agentName = sub.portal_agentes?.nombre || "Agente";
       const clientName = sub.portal_clientes?.empresa || sub.portal_clientes?.nombre || "Cliente";
-      const precioBase = sub.portal_agentes?.precio || 0;
-      const precioFinal = sub.precio_custom !== null ? sub.precio_custom : precioBase;
+      const precioBase = parseFloat(String(sub.portal_agentes?.precio)) || 0;
+      const precioFinal = sub.precio_custom !== null ? parseFloat(String(sub.precio_custom)) : precioBase;
       const descuento = sub.descuento || 0;
       const precioConDescuento = precioFinal * (1 - descuento / 100);
       const periodicidad = sub.portal_agentes?.periodicidad || "mensual";
