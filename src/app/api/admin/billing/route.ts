@@ -69,7 +69,7 @@ export async function GET(request: Request) {
         if (!existingInvoice) {
           // Auto-create the invoice
           const vencimiento = new Date(nextPayment);
-          vencimiento.setDate(vencimiento.getDate() + 30);
+          vencimiento.setDate(vencimiento.getDate() + 10);
 
           const { data: newInvoice } = await supabase.from("portal_facturacion_admin").insert({
             cliente_id: sub.cliente_id,
