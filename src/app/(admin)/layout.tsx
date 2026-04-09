@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar, type NavItem } from "@/components/shared/Sidebar";
 import {
-  LayoutDashboard, Users, CreditCard, ShieldCheck, Zap
+  LayoutDashboard, Users, CreditCard, ShieldCheck, Zap, CalendarClock
 } from "lucide-react";
 
 const adminNavItems: NavItem[] = [
@@ -13,6 +13,7 @@ const adminNavItems: NavItem[] = [
   { id: "clients", label: "Clientes", href: "/admin/clients", icon: Users },
   { id: "agentes", label: "Agentes", href: "/admin/agentes", icon: Zap },
   { id: "billing", label: "Facturación", href: "/admin/billing", icon: CreditCard },
+  { id: "upcoming", label: "Próximos pagos", href: "/admin/upcoming", icon: CalendarClock },
   { id: "audit", label: "Auditoría", href: "/admin/audit", icon: ShieldCheck },
 ];
 

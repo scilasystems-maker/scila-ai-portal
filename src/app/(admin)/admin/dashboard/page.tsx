@@ -40,7 +40,7 @@ export default function AdminDashboard() {
       setStats({
         totalClients: clientList.length,
         activeClients: clientList.filter((c: any) => c.estado === "activo").length,
-        totalFacturado: billing.resumen?.total || 0,
+        totalFacturado: billing.resumen?.pagado || 0,
         pendiente: billing.resumen?.pendiente || 0,
         clients: clientList,
         recentBilling: (billing.facturas || []).slice(0, 5),
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
               <div className="p-2.5 rounded-lg bg-warning/10"><CreditCard className="w-5 h-5 text-warning" /></div>
             </div>
             <p className="text-2xl font-bold">{s.totalFacturado.toFixed(0)}€</p>
-            <p className="text-sm text-[var(--muted-foreground)] mt-1">Total facturado</p>
+            <p className="text-sm text-[var(--muted-foreground)] mt-1">Total cobrado</p>
           </div>
           <div className="card">
             <div className="flex items-start justify-between mb-3">

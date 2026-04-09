@@ -36,25 +36,40 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/admin/client-agentes — Assign agent to client
+// POST /api/admin/client-agentes — Assign agent to client + auto-create invoice
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const supabase = await createAdminSupabase();
 
+    const precioCustom = body.precio_custom !== undefined && body.precio_custom !== "" ? parseFloat(body.precio_custom) : null;
+    const descuento = body.descuento ? parseFloat(body.descuento) : 0;
+
+    // 1. First, get the agent details BEFORE inserting
+    const { data: agente } = await supabase
+      .from("portal_agentes")
+      .select("id, nombre, precio, periodicidad")
+      .eq("id", body.agente_id)
+      .single();
+
+    if (!agente) {
+      return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+    }
+
+    // 2. Insert the assignment
     const { data, error } = await supabase
       .from("portal_cliente_agentes")
       .insert({
         cliente_id: body.cliente_id,
         agente_id: body.agente_id,
-        precio_custom: body.precio_custom !== undefined && body.precio_custom !== "" ? parseFloat(body.precio_custom) : null,
-        descuento: body.descuento ? parseFloat(body.descuento) : 0,
+        precio_custom: precioCustom,
+        descuento,
         fecha_inicio: body.fecha_inicio || new Date().toISOString().split("T")[0],
         fecha_fin: body.fecha_fin || null,
         activo: true,
         notas: body.notas || null,
       })
-      .select("*, portal_agentes(nombre, descripcion, precio, periodicidad)")
+      .select("*")
       .single();
 
     if (error) {
@@ -63,7 +78,30 @@ export async function POST(request: Request) {
       }
       throw error;
     }
-    return NextResponse.json(data);
+
+    // 3. Auto-create pending invoice for first payment using the agent data we already have
+    const precioBase = agente.precio || 0;
+    const precioFinal = precioCustom !== null ? precioCustom : precioBase;
+    const precioConDescuento = precioFinal * (1 - descuento / 100);
+
+    if (precioConDescuento > 0) {
+      const now = new Date();
+      const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+      const vencimiento = new Date(now);
+      vencimiento.setDate(vencimiento.getDate() + 30);
+
+      await supabase.from("portal_facturacion_admin").insert({
+        cliente_id: body.cliente_id,
+        concepto: `${agente.nombre} — ${mesActual}`,
+        importe: precioConDescuento,
+        estado: "pendiente",
+        fecha_emision: now.toISOString().split("T")[0],
+        fecha_vencimiento: vencimiento.toISOString().split("T")[0],
+        notas: descuento > 0 ? `Dto ${descuento}% aplicado` : null,
+      });
+    }
+
+    return NextResponse.json({ ...data, portal_agentes: agente });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
