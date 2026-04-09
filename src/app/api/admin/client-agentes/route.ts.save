@@ -81,7 +81,8 @@ export async function POST(request: Request) {
 
     console.log("INVOICE-DEBUG: agente=", agente.nombre, "precio=", agente.precio, "precioBase=", parseFloat(String(agente.precio))); // 3. Auto-create pending invoice for first payment using the agent data we already have
     const precioBase = parseFloat(String(agente.precio)) || 0;
-    const precioFinal = (precioCustom !== null && precioCustom === precioCustom) ? precioCustom : precioBase;
+    const precioFinal = precioCustom !== null ? precioCustom : precioBase;
+    const precioFinal = (precioCustom !== null && !isNaN(precioCustom)) ? precioCustom : precioBase;	
     const precioConDescuento = precioFinal * (1 - descuento / 100);
 
     console.log("CALC-DEBUG:", precioCustom, precioBase, precioFinal, descuento, precioConDescuento); if (precioConDescuento > 0 && !isNaN(precioConDescuento)) {
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
         importe: precioConDescuento,
         estado: "pendiente",
         fecha_emision: now.toISOString().split("T")[0],
-        fecha_vencimiento: null,
+        fecha_vencimiento: vencimiento.toISOString().split("T")[0],
         notas: descuento > 0 ? `Dto ${descuento}% aplicado` : null,
       });
       console.log("FACTURA-RESULT: error=", JSON.stringify(factError), "cliente_id=", body.cliente_id, "importe=", precioConDescuento);
