@@ -9,9 +9,7 @@ import { CalendarView } from "@/components/portal/CalendarView";
 import {
   Search, Loader2, ChevronLeft, ChevronRight, Trash2,
   Plus, X, Eye, AlertCircle, RefreshCw, Table2, Kanban,
-  CalendarDays, Edit, Download, ExternalLink, EyeOff,
-  Instagram, Mail, Facebook, Linkedin, Phone, Globe,
-  MessageCircle, Building2
+  CalendarDays, Edit, Download
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -40,123 +38,6 @@ const DEFAULT_STATUSES: Record<string, string[]> = {
   citas: ["pendiente", "confirmada", "completada", "cancelada", "no-show"],
 };
 
-// ─── Webs helpers ─────────────────────────────────────────────────────────────
-
-function WebsStatusBadge({ status }: { status: string }) {
-  const s = status?.toLowerCase();
-  const cfg: Record<string, { label: string; cls: string }> = {
-    activa:    { label: "Activa",    cls: "bg-success/10 text-success border-success/20" },
-    cancelada: { label: "Cancelada", cls: "bg-danger/10 text-danger border-danger/20" },
-    prueba:    { label: "Prueba",    cls: "bg-orange-400/10 text-orange-400 border-orange-400/20" },
-    expirada:  { label: "Expirada", cls: "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]" },
-  };
-  const c = cfg[s] ?? { label: status || "—", cls: "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]" };
-  return (
-    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium border", c.cls)}>{c.label}</span>
-  );
-}
-
-function PasswordCell({ value }: { value: string }) {
-  const [show, setShow] = useState(false);
-  if (!value) return <span className="text-[var(--muted-foreground)]">—</span>;
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="text-sm font-mono">{show ? value : "••••••••"}</span>
-      <button
-        onClick={e => { e.stopPropagation(); setShow(v => !v); }}
-        className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-        title={show ? "Ocultar" : "Mostrar"}
-      >
-        {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-      </button>
-    </span>
-  );
-}
-
-function FaviconUrl({ url, label }: { url: string; label?: string }) {
-  if (!url) return <span className="text-[var(--muted-foreground)]">—</span>;
-  let domain = "";
-  try { domain = new URL(url.startsWith("http") ? url : `https://${url}`).hostname; } catch { domain = url; }
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  return (
-    <a
-      href={url.startsWith("http") ? url : `https://${url}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={e => e.stopPropagation()}
-      className="flex items-center gap-2 text-brand-cyan hover:underline group"
-    >
-      <img src={faviconUrl} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-      <span className="text-sm truncate max-w-[180px]">{label || domain}</span>
-      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-    </a>
-  );
-}
-
-function PriceCell({ value }: { value: any }) {
-  const num = parseFloat(String(value));
-  if (isNaN(num)) return <span className="text-[var(--muted-foreground)]">—</span>;
-  return <span className="text-sm font-medium">{num.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</span>;
-}
-
-// ─── Empresas helpers ─────────────────────────────────────────────────────────
-
-const MEDIO_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  instagram:  { icon: Instagram,     color: "text-pink-400",      label: "Instagram" },
-  email:      { icon: Mail,          color: "text-brand-cyan",    label: "Email" },
-  facebook:   { icon: Facebook,      color: "text-blue-500",      label: "Facebook" },
-  linkedin:   { icon: Linkedin,      color: "text-blue-400",      label: "LinkedIn" },
-  whatsapp:   { icon: MessageCircle, color: "text-success",       label: "WhatsApp" },
-  telefono:   { icon: Phone,         color: "text-brand-purple",  label: "Teléfono" },
-  "teléfono": { icon: Phone,         color: "text-brand-purple",  label: "Teléfono" },
-  web:        { icon: Globe,         color: "text-blue-300",      label: "Web" },
-};
-
-function MedioContactoBadge({ medio }: { medio: string }) {
-  if (!medio) return <span className="text-[var(--muted-foreground)]">—</span>;
-  const key = medio.toLowerCase();
-  const cfg = MEDIO_CONFIG[key];
-  const Icon = cfg?.icon ?? Building2;
-  const color = cfg?.color ?? "text-[var(--muted-foreground)]";
-  return (
-    <span className={cn("flex items-center gap-1.5 text-sm font-medium", color)}>
-      <Icon className="w-4 h-4 flex-shrink-0" />
-      {cfg?.label ?? medio}
-    </span>
-  );
-}
-
-function EmpresasStatusBadge({ status }: { status: string }) {
-  const s = status?.toLowerCase();
-  const cfg: Record<string, { label: string; cls: string }> = {
-    "contactado":        { label: "Contactado",        cls: "bg-orange-400/10 text-orange-400 border-orange-400/20" },
-    "contestado":        { label: "Contestado",        cls: "bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20" },
-    "interesado":        { label: "Interesado",        cls: "bg-brand-purple/10 text-brand-purple border-brand-purple/20" },
-    "venta cerrada":     { label: "Venta cerrada",     cls: "bg-success/10 text-success border-success/20" },
-    "rechazado":         { label: "Rechazado",         cls: "bg-danger/10 text-danger border-danger/20" },
-    "cliente potencial": { label: "Cliente potencial", cls: "bg-blue-400/10 text-blue-400 border-blue-400/20" },
-  };
-  const c = cfg[s] ?? { label: status || "—", cls: "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]" };
-  return (
-    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium border", c.cls)}>{c.label}</span>
-  );
-}
-
-function FechaSeguimientoCell({ value }: { value: string }) {
-  if (!value) return <span className="text-[var(--muted-foreground)]">—</span>;
-  const fecha = new Date(value);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const isPastOrToday = fecha <= today;
-  return (
-    <span className={cn("text-sm font-medium flex items-center gap-1", isPastOrToday ? "text-danger font-semibold" : "")}>
-      {isPastOrToday && <span>⚠️</span>}
-      {formatDate(value)}
-    </span>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
 export default function ModulePage() {
   const params = useParams();
   const moduleId = params.moduleId as string;
@@ -173,21 +54,19 @@ export default function ModulePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("tabla");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
-  const [filterEstado, setFilterEstado] = useState("");
-  const [filterMedio, setFilterMedio] = useState("");
 
   const fetchData = useCallback(async (fetchAll = false) => {
     setLoading(true);
     setError(null);
     try {
-      const p = new URLSearchParams({
+      const params = new URLSearchParams({
         module_id: moduleId,
         page: fetchAll ? "1" : page.toString(),
         limit: fetchAll ? "500" : "25",
       });
-      if (search && !fetchAll) p.set("search", search);
+      if (search && !fetchAll) params.set("search", search);
 
-      const res = await fetch(`/api/portal/data?${p}`);
+      const res = await fetch(`/api/portal/data?${params}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
 
@@ -197,6 +76,7 @@ export default function ModulePage() {
         setData(json);
       }
 
+      // Auto-detect best view
       if (!data && json.modulo) {
         if (json.modulo.tipo === "citas" && json.modulo.mapeo_campos?.fecha) {
           setViewMode("calendario");
@@ -213,7 +93,7 @@ export default function ModulePage() {
 
   useEffect(() => {
     fetchData();
-    fetchData(true);
+    fetchData(true); // Also fetch all for kanban/calendar
   }, [fetchData]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -240,6 +120,7 @@ export default function ModulePage() {
 
   const handleSave = async (record: Record<string, any>) => {
     if (editingRecord) {
+      // Update
       const res = await fetch("/api/portal/data", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -247,6 +128,7 @@ export default function ModulePage() {
       });
       if (!res.ok) { const json = await res.json(); throw new Error(json.error); }
     } else {
+      // Create
       const res = await fetch("/api/portal/data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -262,6 +144,7 @@ export default function ModulePage() {
   const openCreate = () => { setEditingRecord(null); setModalOpen(true); };
   const openEdit = (row: any) => { setEditingRecord(row); setModalOpen(true); };
 
+  // Get columns for display
   const getDisplayColumns = () => {
     if (!data?.modulo.mapeo_campos) return [];
     return Object.entries(data.modulo.mapeo_campos)
@@ -269,10 +152,10 @@ export default function ModulePage() {
       .map(([displayName, realCol]) => ({
         key: realCol,
         label: displayName.charAt(0).toUpperCase() + displayName.slice(1).replace(/_/g, " "),
-        displayName,
       }));
   };
 
+  // Get form columns for the modal
   const getFormColumns = () => {
     if (!data?.modulo.mapeo_campos) return [];
     return Object.entries(data.modulo.mapeo_campos)
@@ -286,7 +169,6 @@ export default function ModulePage() {
         if (displayName.includes("email")) type = "email";
         if (displayName.includes("telefono") || displayName.includes("phone")) type = "tel";
         if (displayName.includes("notas") || displayName.includes("mensaje")) type = "textarea";
-        if (displayName === "password") type = "password";
         return { key: realCol, label, type };
       });
   };
@@ -426,51 +308,9 @@ export default function ModulePage() {
 
   const columns = getDisplayColumns();
   const modulo = data?.modulo;
-  const tipo = modulo?.tipo;
-  const mapeo = modulo?.mapeo_campos ?? {};
-
   const availableViews: ViewMode[] = ["tabla"];
-  if (mapeo?.estado && tipo !== "webs" && tipo !== "empresas") availableViews.push("kanban");
-  if (mapeo?.fecha || tipo === "citas") availableViews.push("calendario");
-
-  const empresasData = (data?.data ?? []).filter(row => {
-    if (filterEstado && (mapeo.estado ? row[mapeo.estado] : "")?.toLowerCase() !== filterEstado.toLowerCase()) return false;
-    if (filterMedio && (mapeo.medio_contacto ? row[mapeo.medio_contacto] : "")?.toLowerCase() !== filterMedio.toLowerCase()) return false;
-    return true;
-  });
-
-  const displayData = tipo === "empresas" ? empresasData : (data?.data ?? []);
-
-  const actionButtons = (row: any) => (
-    <div className="flex items-center justify-end gap-1">
-      {modulo?.permite_editar && (
-        <button onClick={e => { e.stopPropagation(); openEdit(row); }}
-          className="p-1.5 rounded hover:bg-brand-cyan/10 text-[var(--muted-foreground)] hover:text-brand-cyan transition-colors" title="Editar">
-          <Edit className="w-4 h-4" />
-        </button>
-      )}
-      {modulo?.permite_eliminar && (
-        <button onClick={e => { e.stopPropagation(); handleDelete(row.id); }}
-          disabled={deleting === row.id}
-          className="p-1.5 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger transition-colors" title="Eliminar">
-          {deleting === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </button>
-      )}
-    </div>
-  );
-
-  const paginationBar = () => data && data.total_pages > 1 ? (
-    <div className="flex items-center justify-between mt-4">
-      <span className="text-sm text-[var(--muted-foreground)]">
-        {((page - 1) * data.limit) + 1}-{Math.min(page * data.limit, data.total)} de {data.total}
-      </span>
-      <div className="flex items-center gap-2">
-        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-ghost p-2 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-        <span className="text-sm font-medium">{page} / {data.total_pages}</span>
-        <button onClick={() => setPage(p => Math.min(data.total_pages, p + 1))} disabled={page === data.total_pages} className="btn-ghost p-2 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
-      </div>
-    </div>
-  ) : null;
+  if (modulo?.mapeo_campos?.estado) availableViews.push("kanban");
+  if (modulo?.mapeo_campos?.fecha || modulo?.tipo === "citas") availableViews.push("calendario");
 
   return (
     <>
@@ -496,24 +336,7 @@ export default function ModulePage() {
             <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 btn-ghost p-1 text-xs">Buscar</button>
           </form>
 
-          {/* Empresas filters */}
-          {tipo === "empresas" && (
-            <>
-              <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} className="input-field text-sm max-w-[160px]">
-                <option value="">Todos los estados</option>
-                {["Contactado", "Contestado", "Interesado", "Venta cerrada", "Rechazado", "Cliente potencial"].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <select value={filterMedio} onChange={e => setFilterMedio(e.target.value)} className="input-field text-sm max-w-[160px]">
-                <option value="">Todos los medios</option>
-                {["Instagram", "Email", "Facebook", "LinkedIn", "WhatsApp", "Teléfono", "Web"].map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </>
-          )}
-
+          {/* View toggles */}
           {availableViews.length > 1 && (
             <div className="flex border border-[var(--border)] rounded-lg overflow-hidden">
               {availableViews.map(v => {
@@ -548,104 +371,22 @@ export default function ModulePage() {
           )}
         </div>
 
+        {/* Error */}
         {error && (
           <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
             <AlertCircle className="w-4 h-4" /> {error}
           </div>
         )}
 
+        {/* Loading */}
         {loading && !data && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-brand-purple" />
           </div>
         )}
 
-        {/* ══ WEBS TABLE ══ */}
-        {data && viewMode === "tabla" && tipo === "webs" && (
-          <>
-            <div className="card p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Nombre</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">URL</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Usuario</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Password</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Precio</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Estado</th>
-                      {mapeo.fecha_renovacion && <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Renovación</th>}
-                      {(modulo?.permite_editar || modulo?.permite_eliminar) && <th className="w-24" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.data.length === 0 ? (
-                      <tr><td colSpan={8} className="text-center py-12 text-[var(--muted-foreground)]">No hay datos todavía</td></tr>
-                    ) : data.data.map(row => (
-                      <tr key={row.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50 transition-colors cursor-pointer"
-                        onClick={() => setSelectedRow(selectedRow?.id === row.id ? null : row)}>
-                        <td className="px-4 py-3 font-medium">{row[mapeo.nombre] || "—"}</td>
-                        <td className="px-4 py-3"><FaviconUrl url={row[mapeo.url]} /></td>
-                        <td className="px-4 py-3 font-mono text-sm">{row[mapeo.usuario] || "—"}</td>
-                        <td className="px-4 py-3"><PasswordCell value={row[mapeo.password]} /></td>
-                        <td className="px-4 py-3"><PriceCell value={row[mapeo.precio]} /></td>
-                        <td className="px-4 py-3"><WebsStatusBadge status={row[mapeo.estado]} /></td>
-                        {mapeo.fecha_renovacion && <td className="px-4 py-3 text-sm">{row[mapeo.fecha_renovacion] ? formatDate(row[mapeo.fecha_renovacion]) : "—"}</td>}
-                        {(modulo?.permite_editar || modulo?.permite_eliminar) && <td className="px-4 py-3 text-right">{actionButtons(row)}</td>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {paginationBar()}
-          </>
-        )}
-
-        {/* ══ EMPRESAS TABLE ══ */}
-        {data && viewMode === "tabla" && tipo === "empresas" && (
-          <>
-            <div className="card p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Empresa</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Medio</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Estado</th>
-                      {mapeo.telefono && <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Teléfono</th>}
-                      {mapeo.email && <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Email</th>}
-                      {mapeo.web && <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Web</th>}
-                      {mapeo.fecha_seguimiento && <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Seguimiento</th>}
-                      {(modulo?.permite_editar || modulo?.permite_eliminar) && <th className="w-24" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayData.length === 0 ? (
-                      <tr><td colSpan={8} className="text-center py-12 text-[var(--muted-foreground)]">No hay resultados</td></tr>
-                    ) : displayData.map(row => (
-                      <tr key={row.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50 transition-colors cursor-pointer"
-                        onClick={() => setSelectedRow(selectedRow?.id === row.id ? null : row)}>
-                        <td className="px-4 py-3 font-medium">{row[mapeo.nombre] || "—"}</td>
-                        <td className="px-4 py-3"><MedioContactoBadge medio={row[mapeo.medio_contacto]} /></td>
-                        <td className="px-4 py-3"><EmpresasStatusBadge status={row[mapeo.estado]} /></td>
-                        {mapeo.telefono && <td className="px-4 py-3 text-sm">{row[mapeo.telefono] || "—"}</td>}
-                        {mapeo.email && <td className="px-4 py-3 text-sm">{row[mapeo.email] || "—"}</td>}
-                        {mapeo.web && <td className="px-4 py-3"><FaviconUrl url={row[mapeo.web]} /></td>}
-                        {mapeo.fecha_seguimiento && <td className="px-4 py-3"><FechaSeguimientoCell value={row[mapeo.fecha_seguimiento]} /></td>}
-                        {(modulo?.permite_editar || modulo?.permite_eliminar) && <td className="px-4 py-3 text-right">{actionButtons(row)}</td>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {paginationBar()}
-          </>
-        )}
-
-        {/* ══ GENERIC TABLE VIEW ══ */}
-        {data && viewMode === "tabla" && tipo !== "webs" && tipo !== "empresas" && (
+        {/* ══ TABLE VIEW ══ */}
+        {data && viewMode === "tabla" && (
           <>
             <div className="card p-0 overflow-hidden">
               <div className="overflow-x-auto">
@@ -709,7 +450,24 @@ export default function ModulePage() {
                 </table>
               </div>
             </div>
-            {paginationBar()}
+
+            {/* Pagination */}
+            {data.total_pages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-sm text-[var(--muted-foreground)]">
+                  {((page - 1) * data.limit) + 1}-{Math.min(page * data.limit, data.total)} de {data.total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-ghost p-2 disabled:opacity-30">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-medium">{page} / {data.total_pages}</span>
+                  <button onClick={() => setPage(p => Math.min(data.total_pages, p + 1))} disabled={page === data.total_pages} className="btn-ghost p-2 disabled:opacity-30">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -762,28 +520,20 @@ export default function ModulePage() {
                 </div>
               </div>
               <div className="p-6 space-y-4">
-                {Object.entries(selectedRow).map(([key, value]) => {
-                  const isPassword = key.toLowerCase().includes("password") || key.toLowerCase().includes("contrasena");
-                  const isUrl = (key.toLowerCase().includes("url") || key.toLowerCase() === "web") && typeof value === "string";
-                  return (
-                    <div key={key}>
-                      <label className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
-                        {key.replace(/_/g, " ")}
-                      </label>
-                      <div className="mt-1 text-sm bg-[var(--muted)] rounded-lg p-3 break-all">
-                        {isPassword && value ? (
-                          <PasswordCell value={String(value)} />
-                        ) : isUrl && value ? (
-                          <FaviconUrl url={String(value)} label={String(value)} />
-                        ) : value === null || value === undefined ? (
-                          <span className="text-[var(--muted-foreground)]">—</span>
-                        ) : typeof value === "object" ? (
-                          <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
-                        ) : String(value)}
-                      </div>
+                {Object.entries(selectedRow).map(([key, value]) => (
+                  <div key={key}>
+                    <label className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+                      {key.replace(/_/g, " ")}
+                    </label>
+                    <div className="mt-1 text-sm bg-[var(--muted)] rounded-lg p-3 break-all">
+                      {value === null || value === undefined
+                        ? <span className="text-[var(--muted-foreground)]">—</span>
+                        : typeof value === "object"
+                          ? <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
+                          : String(value)}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           </>

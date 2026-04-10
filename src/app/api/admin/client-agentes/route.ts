@@ -42,12 +42,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const supabase = await createAdminSupabase();
 
-<<<<<<< HEAD
     const rawCustom = body.precio_custom;
     const precioCustom = (rawCustom && rawCustom !== "" && rawCustom !== "null" && Number(rawCustom) === Number(rawCustom)) ? parseFloat(rawCustom) : null;
-=======
-    const precioCustom = body.precio_custom !== undefined && body.precio_custom !== "" ? parseFloat(body.precio_custom) : null;
->>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
     const descuento = body.descuento ? parseFloat(body.descuento) : 0;
 
     // 1. First, get the agent details BEFORE inserting
@@ -84,30 +80,16 @@ export async function POST(request: Request) {
       throw error;
     }
 
-<<<<<<< HEAD
     // 3. Auto-create pending invoice for first payment using the agent data we already have
-=======
-    console.log("INVOICE-DEBUG: agente=", agente.nombre, "precio=", agente.precio, "precioBase=", parseFloat(String(agente.precio))); // 3. Auto-create pending invoice for first payment using the agent data we already have
->>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
     const precioBase = parseFloat(String(agente.precio)) || 0;
     const precioFinal = (precioCustom !== null && precioCustom === precioCustom) ? precioCustom : precioBase;
     const precioConDescuento = precioFinal * (1 - descuento / 100);
 
-<<<<<<< HEAD
     if (precioConDescuento > 0 && !isNaN(precioConDescuento)) {
       const now = new Date();
       const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
 
       await supabase.from("portal_facturacion_admin").insert({
-=======
-    console.log("CALC-DEBUG:", precioCustom, precioBase, precioFinal, descuento, precioConDescuento); if (precioConDescuento > 0 && !isNaN(precioConDescuento)) {
-      const now = new Date();
-      const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-      const vencimiento = new Date(now);
-      vencimiento.setDate(vencimiento.getDate() + 30);
-
-      const {error: factError} = await supabase.from("portal_facturacion_admin").insert({
->>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
         cliente_id: body.cliente_id,
         concepto: `${agente.nombre} — ${mesActual}`,
         importe: precioConDescuento,
@@ -116,10 +98,6 @@ export async function POST(request: Request) {
         fecha_vencimiento: null,
         notas: descuento > 0 ? `Dto ${descuento}% aplicado` : null,
       });
-<<<<<<< HEAD
-=======
-      console.log("FACTURA-RESULT: error=", JSON.stringify(factError), "cliente_id=", body.cliente_id, "importe=", precioConDescuento);
->>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
     }
 
     return NextResponse.json({ ...data, portal_agentes: agente });
