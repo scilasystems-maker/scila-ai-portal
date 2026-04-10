@@ -7,7 +7,11 @@ import {
   ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, Database,
   User, Key, Search, Puzzle, Eye, Rocket, ChevronDown, ChevronUp,
   Users, Calendar, MessageSquare, LayoutGrid, Image, Table2, Kanban,
+<<<<<<< HEAD
   Zap, Plus, Trash2, DollarSign, Percent, X, Globe, Briefcase
+=======
+  Zap, Plus, Trash2, DollarSign, Percent, X, Globe, Building2
+>>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -26,9 +30,15 @@ const MODULE_TYPES = [
   { id: "leads", label: "Leads / CRM", icon: Users, color: "text-brand-purple", bg: "bg-brand-purple/10" },
   { id: "citas", label: "Citas / Reuniones", icon: Calendar, color: "text-brand-cyan", bg: "bg-brand-cyan/10" },
   { id: "conversaciones", label: "Conversaciones", icon: MessageSquare, color: "text-success", bg: "bg-success/10" },
+<<<<<<< HEAD
   { id: "webs", label: "Webs / Suscripciones", icon: Globe, color: "text-warning", bg: "bg-warning/10" },
   { id: "empresas", label: "Empresas Contactadas", icon: Briefcase, color: "text-brand-cyan", bg: "bg-brand-cyan/10" },
   { id: "generico", label: "Genérico", icon: LayoutGrid, color: "text-[var(--muted-foreground)]", bg: "bg-[var(--muted)]" },
+=======
+  { id: "webs", label: "Webs / Suscripciones", icon: Globe, color: "text-blue-400", bg: "bg-blue-400/10" },
+  { id: "empresas", label: "Empresas Contactadas", icon: Building2, color: "text-orange-400", bg: "bg-orange-400/10" },
+  { id: "generico", label: "Genérico", icon: LayoutGrid, color: "text-warning", bg: "bg-warning/10" },
+>>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
 ];
 
 const VISTA_TYPES = [
@@ -904,6 +914,7 @@ function autoMapColumns(columns: any[], moduleType: string): Record<string, stri
     map.session_id = findColumn(colNames, ["session_id", "conversation_id"]) || "";
     map.created_at = findColumn(colNames, ["created_at", "fecha"]) || "";
   } else if (moduleType === "webs") {
+<<<<<<< HEAD
     map.url = findColumn(colNames, ["url", "enlace", "web"]) || "";
     map.nombre_web = findColumn(colNames, ["nombre_web", "nombre", "name"]) || "";
     map.descripcion = findColumn(colNames, ["descripcion", "description"]) || "";
@@ -923,6 +934,25 @@ function autoMapColumns(columns: any[], moduleType: string): Record<string, stri
     map.fecha_contacto = findColumn(colNames, ["fecha_contacto", "fecha", "created_at"]) || "";
     map.fecha_seguimiento = findColumn(colNames, ["fecha_seguimiento", "seguimiento"]) || "";
     map.notas = findColumn(colNames, ["notas", "notes"]) || "";
+=======
+    map.nombre = findColumn(colNames, ["nombre", "name", "sitio"]) || "";
+    map.url = findColumn(colNames, ["url", "web", "sitio_web", "link"]) || "";
+    map.usuario = findColumn(colNames, ["usuario", "user", "username", "login"]) || "";
+    map.password = findColumn(colNames, ["password", "contrasena", "pass", "clave"]) || "";
+    map.precio = findColumn(colNames, ["precio", "price", "coste", "cost", "importe"]) || "";
+    map.estado = findColumn(colNames, ["estado", "status"]) || "";
+    map.fecha_renovacion = findColumn(colNames, ["fecha_renovacion", "fecha_vencimiento", "fecha_expiracion", "renovacion"]) || "";
+    map.notas = findColumn(colNames, ["notas", "notes", "descripcion"]) || "";
+  } else if (moduleType === "empresas") {
+    map.nombre = findColumn(colNames, ["nombre", "empresa", "name", "company"]) || "";
+    map.medio_contacto = findColumn(colNames, ["medio_contacto", "medio", "canal", "source"]) || "";
+    map.estado = findColumn(colNames, ["estado", "status"]) || "";
+    map.telefono = findColumn(colNames, ["telefono", "phone", "tel"]) || "";
+    map.email = findColumn(colNames, ["email", "correo"]) || "";
+    map.web = findColumn(colNames, ["web", "url", "sitio_web", "website"]) || "";
+    map.fecha_seguimiento = findColumn(colNames, ["fecha_seguimiento", "fecha_contacto", "fecha_proximo_contacto"]) || "";
+    map.notas = findColumn(colNames, ["notas", "notes", "descripcion"]) || "";
+>>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
   }
   return map;
 }
@@ -937,7 +967,11 @@ function formatTableName(name: string): string {
 }
 
 function getModuleIcon(tipo: string): string {
+<<<<<<< HEAD
   switch (tipo) { case "leads": return "Users"; case "citas": return "Calendar"; case "conversaciones": return "MessageSquare"; case "webs": return "Globe"; case "empresas": return "Briefcase"; default: return "LayoutGrid"; }
+=======
+  switch (tipo) { case "leads": return "Users"; case "citas": return "Calendar"; case "conversaciones": return "MessageSquare"; case "webs": return "Globe"; case "empresas": return "Building2"; default: return "LayoutGrid"; }
+>>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
 }
 
 function getRequiredFields(tipo: string): { key: string; label: string }[] {
@@ -945,8 +979,13 @@ function getRequiredFields(tipo: string): { key: string; label: string }[] {
     case "leads": return [{ key: "nombre", label: "Nombre" }, { key: "telefono", label: "Teléfono" }, { key: "email", label: "Email" }, { key: "estado", label: "Estado" }, { key: "fecha", label: "Fecha" }, { key: "notas", label: "Notas" }];
     case "citas": return [{ key: "nombre_paciente", label: "Nombre" }, { key: "telefono", label: "Teléfono" }, { key: "fecha", label: "Fecha" }, { key: "hora", label: "Hora" }, { key: "estado", label: "Estado" }, { key: "tipo", label: "Tipo" }, { key: "notas", label: "Notas" }];
     case "conversaciones": return [{ key: "mensaje", label: "Mensaje" }, { key: "rol", label: "Rol" }, { key: "telefono", label: "Teléfono" }, { key: "nombre_cliente", label: "Nombre" }, { key: "session_id", label: "Session ID" }, { key: "created_at", label: "Fecha" }];
+<<<<<<< HEAD
     case "webs": return [{ key: "url", label: "URL" }, { key: "nombre_web", label: "Nombre" }, { key: "descripcion", label: "Descripción" }, { key: "usuario", label: "Usuario" }, { key: "password", label: "Contraseña" }, { key: "precio", label: "Precio" }, { key: "plan", label: "Plan" }, { key: "estado", label: "Estado" }, { key: "notas", label: "Notas" }];
     case "empresas": return [{ key: "nombre_empresa", label: "Empresa" }, { key: "persona_contacto", label: "Persona" }, { key: "medio_contacto", label: "Medio" }, { key: "dato_contacto", label: "Contacto" }, { key: "estado", label: "Estado" }, { key: "mensaje_enviado", label: "Mensaje" }, { key: "fecha_contacto", label: "Fecha contacto" }, { key: "fecha_seguimiento", label: "Seguimiento" }, { key: "notas", label: "Notas" }];
+=======
+    case "webs": return [{ key: "nombre", label: "Nombre" }, { key: "url", label: "URL" }, { key: "usuario", label: "Usuario" }, { key: "password", label: "Password" }, { key: "precio", label: "Precio (€)" }, { key: "estado", label: "Estado" }, { key: "fecha_renovacion", label: "Fecha Renovación" }, { key: "notas", label: "Notas" }];
+    case "empresas": return [{ key: "nombre", label: "Empresa" }, { key: "medio_contacto", label: "Medio Contacto" }, { key: "estado", label: "Estado" }, { key: "telefono", label: "Teléfono" }, { key: "email", label: "Email" }, { key: "web", label: "Web" }, { key: "fecha_seguimiento", label: "Fecha Seguimiento" }, { key: "notas", label: "Notas" }];
+>>>>>>> f6db06fddb9356197dd93b3bbab393f468076fd9
     default: return [];
   }
 }
