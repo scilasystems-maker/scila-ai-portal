@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar, type NavItem } from "@/components/shared/Sidebar";
 import {
-  LayoutDashboard, Users, CreditCard, ShieldCheck, Zap, CalendarClock
+  LayoutDashboard, Users, CreditCard, ShieldCheck, Zap, CalendarClock, Database
 } from "lucide-react";
 
 const adminNavItems: NavItem[] = [
@@ -14,6 +14,7 @@ const adminNavItems: NavItem[] = [
   { id: "agentes", label: "Agentes", href: "/admin/agentes", icon: Zap },
   { id: "billing", label: "Facturación", href: "/admin/billing", icon: CreditCard },
   { id: "upcoming", label: "Próximos pagos", href: "/admin/upcoming", icon: CalendarClock },
+  { id: "templates", label: "Plantillas", href: "/admin/templates", icon: Database },
   { id: "audit", label: "Auditoría", href: "/admin/audit", icon: ShieldCheck },
 ];
 

@@ -185,11 +185,125 @@ export default function ModulePage() {
 
   const getStatusColor = (status: string) => {
     const s = status?.toLowerCase();
-    if (["activo", "confirmada", "completada", "ganado", "pagado"].includes(s)) return "bg-success/10 text-success";
-    if (["cancelada", "perdido", "vencido", "no-show"].includes(s)) return "bg-danger/10 text-danger";
-    if (["pendiente", "nuevo", "trial"].includes(s)) return "bg-warning/10 text-warning";
-    if (["contactado", "cualificado"].includes(s)) return "bg-brand-cyan/10 text-brand-cyan";
+    if (["activo", "activa", "confirmada", "completada", "ganado", "pagado", "venta cerrada"].includes(s)) return "bg-success/10 text-success";
+    if (["cancelada", "cancelado", "perdido", "vencido", "no-show", "rechazado", "expirada"].includes(s)) return "bg-danger/10 text-danger";
+    if (["pendiente", "nuevo", "trial", "prueba", "contactado"].includes(s)) return "bg-warning/10 text-warning";
+    if (["contactado", "cualificado", "contestado", "interesado", "cliente potencial"].includes(s)) return "bg-brand-cyan/10 text-brand-cyan";
     return "bg-[var(--muted)] text-[var(--muted-foreground)]";
+  };
+
+  const getMedioIcon = (medio: string) => {
+    const m = medio?.toLowerCase() || "";
+    if (m.includes("instagram")) return { emoji: "📸", color: "text-pink-500" };
+    if (m.includes("email") || m.includes("correo")) return { emoji: "📧", color: "text-brand-cyan" };
+    if (m.includes("facebook")) return { emoji: "📘", color: "text-blue-500" };
+    if (m.includes("linkedin")) return { emoji: "💼", color: "text-blue-600" };
+    if (m.includes("whatsapp")) return { emoji: "💬", color: "text-success" };
+    if (m.includes("tel")) return { emoji: "📞", color: "text-brand-purple" };
+    return { emoji: "📋", color: "text-[var(--muted-foreground)]" };
+  };
+
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+
+  const renderCustomCell = (row: any, col: { key: string; label: string }, tipo: string) => {
+    const value = row[col.key];
+    const isStatus = col.label.toLowerCase().includes("estado");
+    const campos = modulo?.mapeo_campos || {};
+
+    // ── WEBS module custom rendering ──
+    if (tipo === "webs") {
+      // URL with favicon
+      if (col.key === campos.url || col.key === "url") {
+        const url = value || "";
+        let domain = "";
+        try { domain = new URL(url.startsWith("http") ? url : `https://${url}`).hostname; } catch { domain = url; }
+        return (
+          <div className="flex items-center gap-2">
+            {domain && <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} alt="" className="w-5 h-5 rounded" onError={(e: any) => e.target.style.display = "none"} />}
+            <a href={url.startsWith("http") ? url : `https://${url}`} target="_blank" rel="noopener" className="text-brand-purple hover:underline text-sm truncate max-w-[200px]" onClick={e => e.stopPropagation()}>
+              {domain || url || "—"}
+            </a>
+          </div>
+        );
+      }
+      // Password hidden
+      if (col.key === campos.password || col.key === "password") {
+        const rowId = row.id || "";
+        return (
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-mono">{showPasswords[rowId] ? (value || "—") : value ? "••••••" : "—"}</span>
+            {value && (
+              <button onClick={e => { e.stopPropagation(); setShowPasswords(p => ({ ...p, [rowId]: !p[rowId] })); }} className="text-[10px] text-brand-purple hover:underline ml-1">
+                {showPasswords[rowId] ? "ocultar" : "ver"}
+              </button>
+            )}
+          </div>
+        );
+      }
+      // Precio
+      if (col.key === campos.precio || col.key === "precio") {
+        return <span className="text-sm font-semibold">{value ? `${value}€` : "—"}</span>;
+      }
+      // Estado
+      if (isStatus) {
+        return <span className={cn("text-xs px-2 py-1 rounded-full font-medium", getStatusColor(value))}>{value || "—"}</span>;
+      }
+    }
+
+    // ── EMPRESAS module custom rendering ──
+    if (tipo === "empresas") {
+      // Medio de contacto with icon
+      if (col.key === campos.medio_contacto || col.key === "medio_contacto") {
+        const { emoji } = getMedioIcon(value);
+        return (
+          <span className="flex items-center gap-1.5 text-sm">
+            <span>{emoji}</span>
+            <span>{value || "—"}</span>
+          </span>
+        );
+      }
+      // Estado with colors
+      if (isStatus) {
+        return <span className={cn("text-xs px-2 py-1 rounded-full font-medium", getStatusColor(value))}>{value || "—"}</span>;
+      }
+      // Web empresa with favicon
+      if (col.key === campos.web_empresa || col.key === "web_empresa") {
+        const url = value || "";
+        let domain = "";
+        try { domain = new URL(url.startsWith("http") ? url : `https://${url}`).hostname; } catch { domain = url; }
+        if (!url) return <span className="text-sm">—</span>;
+        return (
+          <div className="flex items-center gap-2">
+            <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`} alt="" className="w-4 h-4 rounded" onError={(e: any) => e.target.style.display = "none"} />
+            <a href={url.startsWith("http") ? url : `https://${url}`} target="_blank" rel="noopener" className="text-brand-purple hover:underline text-sm" onClick={e => e.stopPropagation()}>
+              {domain || "—"}
+            </a>
+          </div>
+        );
+      }
+      // Fecha seguimiento with alert
+      if (col.key === campos.fecha_seguimiento || col.key === "fecha_seguimiento") {
+        if (!value) return <span className="text-sm">—</span>;
+        const today = new Date().toISOString().split("T")[0];
+        const isPast = value < today;
+        const isToday = value === today;
+        return (
+          <span className={cn("text-sm", isPast && "text-danger font-semibold", isToday && "text-warning font-semibold")}>
+            {formatDate(value)} {isPast && "⚠️"} {isToday && "📌"}
+          </span>
+        );
+      }
+      // Mensaje enviado truncated
+      if (col.key === campos.mensaje_enviado || col.key === "mensaje_enviado") {
+        return <span className="text-sm text-[var(--muted-foreground)]" title={value}>{value ? (value.length > 40 ? value.slice(0, 40) + "..." : value) : "—"}</span>;
+      }
+    }
+
+    // ── Default rendering ──
+    if (isStatus) {
+      return <span className={cn("text-xs px-2 py-1 rounded-full font-medium", getStatusColor(value))}>{value || "—"}</span>;
+    }
+    return <span className="text-sm">{formatCell(value)}</span>;
   };
 
   const columns = getDisplayColumns();
@@ -301,15 +415,9 @@ export default function ModulePage() {
                         className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50 transition-colors cursor-pointer"
                         onClick={() => setSelectedRow(selectedRow?.id === row.id ? null : row)}>
                         {columns.map(col => {
-                          const value = row[col.key];
-                          const isStatus = col.label.toLowerCase().includes("estado");
                           return (
                             <td key={col.key} className="px-4 py-3 whitespace-nowrap">
-                              {isStatus ? (
-                                <span className={cn("text-xs px-2 py-1 rounded-full font-medium", getStatusColor(value))}>{value || "—"}</span>
-                              ) : (
-                                <span className="text-sm">{formatCell(value)}</span>
-                              )}
+                              {renderCustomCell(row, col, modulo?.tipo || "generico")}
                             </td>
                           );
                         })}

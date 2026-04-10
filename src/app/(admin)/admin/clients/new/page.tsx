@@ -7,7 +7,7 @@ import {
   ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, Database,
   User, Key, Search, Puzzle, Eye, Rocket, ChevronDown, ChevronUp,
   Users, Calendar, MessageSquare, LayoutGrid, Image, Table2, Kanban,
-  Zap, Plus, Trash2, DollarSign, Percent, X
+  Zap, Plus, Trash2, DollarSign, Percent, X, Globe, Briefcase
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,9 @@ const MODULE_TYPES = [
   { id: "leads", label: "Leads / CRM", icon: Users, color: "text-brand-purple", bg: "bg-brand-purple/10" },
   { id: "citas", label: "Citas / Reuniones", icon: Calendar, color: "text-brand-cyan", bg: "bg-brand-cyan/10" },
   { id: "conversaciones", label: "Conversaciones", icon: MessageSquare, color: "text-success", bg: "bg-success/10" },
-  { id: "generico", label: "Genérico", icon: LayoutGrid, color: "text-warning", bg: "bg-warning/10" },
+  { id: "webs", label: "Webs / Suscripciones", icon: Globe, color: "text-warning", bg: "bg-warning/10" },
+  { id: "empresas", label: "Empresas Contactadas", icon: Briefcase, color: "text-brand-cyan", bg: "bg-brand-cyan/10" },
+  { id: "generico", label: "Genérico", icon: LayoutGrid, color: "text-[var(--muted-foreground)]", bg: "bg-[var(--muted)]" },
 ];
 
 const VISTA_TYPES = [
@@ -901,6 +903,26 @@ function autoMapColumns(columns: any[], moduleType: string): Record<string, stri
     map.nombre_cliente = findColumn(colNames, ["nombre_cliente", "nombre"]) || "";
     map.session_id = findColumn(colNames, ["session_id", "conversation_id"]) || "";
     map.created_at = findColumn(colNames, ["created_at", "fecha"]) || "";
+  } else if (moduleType === "webs") {
+    map.url = findColumn(colNames, ["url", "enlace", "web"]) || "";
+    map.nombre_web = findColumn(colNames, ["nombre_web", "nombre", "name"]) || "";
+    map.descripcion = findColumn(colNames, ["descripcion", "description"]) || "";
+    map.usuario = findColumn(colNames, ["usuario", "username", "user"]) || "";
+    map.password = findColumn(colNames, ["password", "contraseña", "pass"]) || "";
+    map.precio = findColumn(colNames, ["precio", "price", "coste"]) || "";
+    map.plan = findColumn(colNames, ["plan", "tipo"]) || "";
+    map.estado = findColumn(colNames, ["estado", "status"]) || "";
+    map.notas = findColumn(colNames, ["notas", "notes"]) || "";
+  } else if (moduleType === "empresas") {
+    map.nombre_empresa = findColumn(colNames, ["nombre_empresa", "empresa", "nombre"]) || "";
+    map.persona_contacto = findColumn(colNames, ["persona_contacto", "contacto", "persona"]) || "";
+    map.medio_contacto = findColumn(colNames, ["medio_contacto", "medio", "canal"]) || "";
+    map.dato_contacto = findColumn(colNames, ["dato_contacto", "email", "telefono"]) || "";
+    map.estado = findColumn(colNames, ["estado", "status"]) || "";
+    map.mensaje_enviado = findColumn(colNames, ["mensaje_enviado", "mensaje"]) || "";
+    map.fecha_contacto = findColumn(colNames, ["fecha_contacto", "fecha", "created_at"]) || "";
+    map.fecha_seguimiento = findColumn(colNames, ["fecha_seguimiento", "seguimiento"]) || "";
+    map.notas = findColumn(colNames, ["notas", "notes"]) || "";
   }
   return map;
 }
@@ -915,7 +937,7 @@ function formatTableName(name: string): string {
 }
 
 function getModuleIcon(tipo: string): string {
-  switch (tipo) { case "leads": return "Users"; case "citas": return "Calendar"; case "conversaciones": return "MessageSquare"; default: return "LayoutGrid"; }
+  switch (tipo) { case "leads": return "Users"; case "citas": return "Calendar"; case "conversaciones": return "MessageSquare"; case "webs": return "Globe"; case "empresas": return "Briefcase"; default: return "LayoutGrid"; }
 }
 
 function getRequiredFields(tipo: string): { key: string; label: string }[] {
@@ -923,6 +945,8 @@ function getRequiredFields(tipo: string): { key: string; label: string }[] {
     case "leads": return [{ key: "nombre", label: "Nombre" }, { key: "telefono", label: "Teléfono" }, { key: "email", label: "Email" }, { key: "estado", label: "Estado" }, { key: "fecha", label: "Fecha" }, { key: "notas", label: "Notas" }];
     case "citas": return [{ key: "nombre_paciente", label: "Nombre" }, { key: "telefono", label: "Teléfono" }, { key: "fecha", label: "Fecha" }, { key: "hora", label: "Hora" }, { key: "estado", label: "Estado" }, { key: "tipo", label: "Tipo" }, { key: "notas", label: "Notas" }];
     case "conversaciones": return [{ key: "mensaje", label: "Mensaje" }, { key: "rol", label: "Rol" }, { key: "telefono", label: "Teléfono" }, { key: "nombre_cliente", label: "Nombre" }, { key: "session_id", label: "Session ID" }, { key: "created_at", label: "Fecha" }];
+    case "webs": return [{ key: "url", label: "URL" }, { key: "nombre_web", label: "Nombre" }, { key: "descripcion", label: "Descripción" }, { key: "usuario", label: "Usuario" }, { key: "password", label: "Contraseña" }, { key: "precio", label: "Precio" }, { key: "plan", label: "Plan" }, { key: "estado", label: "Estado" }, { key: "notas", label: "Notas" }];
+    case "empresas": return [{ key: "nombre_empresa", label: "Empresa" }, { key: "persona_contacto", label: "Persona" }, { key: "medio_contacto", label: "Medio" }, { key: "dato_contacto", label: "Contacto" }, { key: "estado", label: "Estado" }, { key: "mensaje_enviado", label: "Mensaje" }, { key: "fecha_contacto", label: "Fecha contacto" }, { key: "fecha_seguimiento", label: "Seguimiento" }, { key: "notas", label: "Notas" }];
     default: return [];
   }
 }

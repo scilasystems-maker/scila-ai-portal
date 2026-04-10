@@ -42,7 +42,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const supabase = await createAdminSupabase();
 
-    const precioCustom = body.precio_custom !== undefined && body.precio_custom !== "" ? parseFloat(body.precio_custom) : null;
+    const rawCustom = body.precio_custom;
+    const precioCustom = (rawCustom && rawCustom !== "" && rawCustom !== "null" && Number(rawCustom) === Number(rawCustom)) ? parseFloat(rawCustom) : null;
     const descuento = body.descuento ? parseFloat(body.descuento) : 0;
 
     // 1. First, get the agent details BEFORE inserting
@@ -81,14 +82,12 @@ export async function POST(request: Request) {
 
     // 3. Auto-create pending invoice for first payment using the agent data we already have
     const precioBase = parseFloat(String(agente.precio)) || 0;
-    const precioFinal = precioCustom !== null ? precioCustom : precioBase;
+    const precioFinal = (precioCustom !== null && precioCustom === precioCustom) ? precioCustom : precioBase;
     const precioConDescuento = precioFinal * (1 - descuento / 100);
 
     if (precioConDescuento > 0 && !isNaN(precioConDescuento)) {
       const now = new Date();
       const mesActual = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-      const vencimiento = new Date(now);
-      vencimiento.setDate(vencimiento.getDate() + 30);
 
       await supabase.from("portal_facturacion_admin").insert({
         cliente_id: body.cliente_id,
@@ -96,7 +95,7 @@ export async function POST(request: Request) {
         importe: precioConDescuento,
         estado: "pendiente",
         fecha_emision: now.toISOString().split("T")[0],
-        fecha_vencimiento: vencimiento.toISOString().split("T")[0],
+        fecha_vencimiento: null,
         notas: descuento > 0 ? `Dto ${descuento}% aplicado` : null,
       });
     }
