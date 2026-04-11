@@ -9,7 +9,7 @@ import { CalendarView } from "@/components/portal/CalendarView";
 import {
   Search, Loader2, ChevronLeft, ChevronRight, Trash2,
   Plus, X, Eye, AlertCircle, RefreshCw, Table2, Kanban,
-  CalendarDays, Edit, Download
+  CalendarDays, Edit, Download, Calendar
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -385,8 +385,21 @@ export default function ModulePage() {
           </div>
         )}
 
+        {/* ══ CITAS CARD VIEW ══ */}
+        {data && viewMode === "tabla" && modulo?.tipo === "citas" && (
+          <CitasCardView
+            data={data.data}
+            campos={modulo.mapeo_campos}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            deleting={deleting}
+            permiteEditar={modulo.permite_editar}
+            permiteEliminar={modulo.permite_eliminar}
+          />
+        )}
+
         {/* ══ TABLE VIEW ══ */}
-        {data && viewMode === "tabla" && (
+        {data && viewMode === "tabla" && modulo?.tipo !== "citas" && (
           <>
             <div className="card p-0 overflow-hidden">
               <div className="overflow-x-auto">
@@ -550,5 +563,157 @@ export default function ModulePage() {
         />
       </div>
     </>
+  );
+}
+
+// ══ CITAS CARD VIEW COMPONENT ══
+function CitasCardView({ data, campos, onEdit, onDelete, deleting, permiteEditar, permiteEliminar }: {
+  data: any[]; campos: Record<string, string>; onEdit: (row: any) => void; onDelete: (id: string) => void;
+  deleting: string | null; permiteEditar: boolean; permiteEliminar: boolean;
+}) {
+  const [citasFilter, setCitasFilter] = useState("todas");
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const getCitaDate = (row: any) => row[campos.fecha] || row.fecha_cita || row.fecha || "";
+  const getCitaHora = (row: any) => row[campos.hora] || row.hora_cita || row.hora || "";
+  const getCitaNombre = (row: any) => row[campos.nombre_paciente] || row[campos.nombre] || row.paciente_nombre || row.nombre || "";
+  const getCitaTipo = (row: any) => row[campos.tipo] || row.tipo_cita || row.tipo || "";
+  const getCitaEstado = (row: any) => row[campos.estado] || row.estado || "";
+  const getCitaTelefono = (row: any) => row[campos.telefono] || row.paciente_telefono || row.telefono || "";
+  const getCitaNotas = (row: any) => row[campos.notas] || row.notas || "";
+
+  const getStatusColor = (s: string) => {
+    const sl = s?.toLowerCase();
+    if (["completada", "confirmada", "realizada"].includes(sl)) return "bg-success/10 text-success border-success/20";
+    if (["cancelada", "no-show"].includes(sl)) return "bg-danger/10 text-danger border-danger/20";
+    if (["pendiente"].includes(sl)) return "bg-warning/10 text-warning border-warning/20";
+    return "bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20";
+  };
+
+  const getTimeLabel = (fecha: string) => {
+    if (!fecha) return "";
+    if (fecha === today) return "Hoy";
+    const diff = Math.ceil((new Date(fecha).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 1) return "Mañana";
+    if (diff === -1) return "Ayer";
+    if (diff > 1 && diff <= 7) return `En ${diff} días`;
+    if (diff < -1) return `Hace ${Math.abs(diff)} días`;
+    return "";
+  };
+
+  // Sort by date and time
+  const sorted = [...data].sort((a, b) => {
+    const dateA = getCitaDate(a) + " " + getCitaHora(a);
+    const dateB = getCitaDate(b) + " " + getCitaHora(b);
+    return dateB.localeCompare(dateA);
+  });
+
+  // Filter
+  const filtered = sorted.filter(row => {
+    const fecha = getCitaDate(row);
+    if (citasFilter === "hoy") return fecha === today;
+    if (citasFilter === "proximas") return fecha > today;
+    if (citasFilter === "pasadas") return fecha < today;
+    return true;
+  });
+
+  const CITAS_FILTERS = [
+    { id: "todas", label: "Todas", count: data.length },
+    { id: "hoy", label: "Hoy", count: data.filter(r => getCitaDate(r) === today).length },
+    { id: "proximas", label: "Próximas", count: data.filter(r => getCitaDate(r) > today).length },
+    { id: "pasadas", label: "Pasadas", count: data.filter(r => getCitaDate(r) < today).length },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Filter tabs */}
+      <div className="flex border border-[var(--border)] rounded-lg overflow-hidden w-fit">
+        {CITAS_FILTERS.map(f => (
+          <button key={f.id} onClick={() => setCitasFilter(f.id)}
+            className={cn("px-4 py-2 text-xs font-medium transition-colors",
+              citasFilter === f.id ? "bg-brand-purple/10 text-brand-purple" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+            )}>
+            {f.label} <span className="ml-1 text-[10px]">({f.count})</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Cards */}
+      {filtered.length === 0 ? (
+        <div className="card text-center py-12">
+          <Calendar className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+          <p className="text-sm text-[var(--muted-foreground)]">No hay citas {citasFilter !== "todas" ? `${citasFilter}` : ""}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((row, i) => {
+            const fecha = getCitaDate(row);
+            const hora = getCitaHora(row);
+            const nombre = getCitaNombre(row);
+            const tipo = getCitaTipo(row);
+            const estado = getCitaEstado(row);
+            const telefono = getCitaTelefono(row);
+            const notas = getCitaNotas(row);
+            const isPast = fecha < today;
+            const isToday = fecha === today;
+            const timeLabel = getTimeLabel(fecha);
+
+            return (
+              <div key={row.id || i} className={cn(
+                "card flex items-center gap-4 transition-all",
+                isPast && "opacity-50",
+                isToday && "border-brand-purple/30 bg-brand-purple/5"
+              )}>
+                {/* Time block */}
+                <div className={cn("flex-shrink-0 w-16 text-center p-2 rounded-lg", isToday ? "bg-brand-purple/10" : "bg-[var(--muted)]")}>
+                  <p className={cn("text-lg font-bold", isToday && "text-brand-purple")}>{hora || "—"}</p>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">
+                    {fecha ? new Date(fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}
+                  </p>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm">{nombre || "Sin nombre"}</span>
+                    {timeLabel && (
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                        isToday ? "bg-brand-purple/10 text-brand-purple" : isPast ? "bg-[var(--muted)] text-[var(--muted-foreground)]" : "bg-brand-cyan/10 text-brand-cyan"
+                      )}>{timeLabel}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
+                    {tipo && <span>📋 {tipo}</span>}
+                    {telefono && <span>📞 {telefono}</span>}
+                    {notas && <span className="truncate max-w-[200px]">💬 {notas}</span>}
+                  </div>
+                </div>
+
+                {/* Estado */}
+                <span className={cn("text-xs px-2.5 py-1 rounded-full font-medium border flex-shrink-0", getStatusColor(estado))}>
+                  {estado || "—"}
+                </span>
+
+                {/* Actions */}
+                <div className="flex gap-1 flex-shrink-0">
+                  {permiteEditar && (
+                    <button onClick={() => onEdit(row)} className="p-1.5 rounded hover:bg-brand-cyan/10 text-[var(--muted-foreground)] hover:text-brand-cyan">
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
+                  {permiteEliminar && (
+                    <button onClick={() => onDelete(row.id)} disabled={deleting === row.id}
+                      className="p-1.5 rounded hover:bg-danger/10 text-[var(--muted-foreground)] hover:text-danger">
+                      {deleting === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
