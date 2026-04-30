@@ -6,7 +6,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  let d: Date;
+  if (typeof date === "string") {
+    // Detectar DD/MM/YYYY y convertir a YYYY-MM-DD
+    const ddmmyyyy = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      d = new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00`);
+    } else {
+      d = new Date(date);
+    }
+  } else {
+    d = date;
+  }
+  if (isNaN(d.getTime())) return typeof date === "string" ? date : "—";
   return d.toLocaleDateString("es-ES", options ?? { day: "2-digit", month: "short", year: "numeric" });
 }
 

@@ -573,9 +573,21 @@ function CitasCardView({ data, campos, onEdit, onDelete, deleting, permiteEditar
 }) {
   const [citasFilter, setCitasFilter] = useState("todas");
 
+  // Normaliza fechas DD/MM/YYYY → YYYY-MM-DD para comparaciones y Date parsing
+  const normalizeDateStr = (val: string): string => {
+    if (!val) return "";
+    // Ya es YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+    // DD/MM/YYYY
+    const parts = val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (parts) return `${parts[3]}-${parts[2]}-${parts[1]}`;
+    return val;
+  };
+
   const today = new Date().toISOString().split("T")[0];
 
-  const getCitaDate = (row: any) => row[campos.fecha] || row.fecha_cita || row.fecha || "";
+  const getCitaDateRaw = (row: any) => row[campos.fecha] || row.fecha_cita || row.fecha || "";
+  const getCitaDate = (row: any) => normalizeDateStr(getCitaDateRaw(row));
   const getCitaHora = (row: any) => row[campos.hora] || row.hora_cita || row.hora || "";
   const getCitaNombre = (row: any) => row[campos.nombre_paciente] || row[campos.nombre] || row.paciente_nombre || row.nombre || "";
   const getCitaTipo = (row: any) => row[campos.tipo] || row.tipo_cita || row.tipo || "";
