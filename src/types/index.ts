@@ -41,7 +41,7 @@ export interface PortalUsuario {
 export interface PortalModulo {
   id: string;
   cliente_id: string;
-  tipo: "leads" | "citas" | "conversaciones" | "generico";
+  tipo: "leads" | "citas" | "conversaciones" | "generico" | "webs" | "empresas" | "email";
   nombre_display: string;
   icono: string;
   tabla_origen: string;

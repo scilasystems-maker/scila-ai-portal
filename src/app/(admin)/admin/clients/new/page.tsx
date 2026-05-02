@@ -7,7 +7,7 @@ import {
   ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, Database,
   User, Key, Search, Puzzle, Eye, Rocket, ChevronDown, ChevronUp,
   Users, Calendar, MessageSquare, LayoutGrid, Image, Table2, Kanban,
-  Zap, Plus, Trash2, DollarSign, Percent, X, Globe, Briefcase
+  Zap, Plus, Trash2, DollarSign, Percent, X, Globe, Briefcase, Mail
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ const MODULE_TYPES = [
   { id: "conversaciones", label: "Conversaciones", icon: MessageSquare, color: "text-success", bg: "bg-success/10" },
   { id: "webs", label: "Webs / Suscripciones", icon: Globe, color: "text-warning", bg: "bg-warning/10" },
   { id: "empresas", label: "Empresas Contactadas", icon: Briefcase, color: "text-brand-cyan", bg: "bg-brand-cyan/10" },
+  { id: "email", label: "Email / Correo", icon: Mail, color: "text-brand-purple", bg: "bg-brand-purple/10" },
   { id: "generico", label: "Genérico", icon: LayoutGrid, color: "text-[var(--muted-foreground)]", bg: "bg-[var(--muted)]" },
 ];
 
@@ -678,7 +679,7 @@ export default function NewClientWizard() {
                     <span className="text-xs text-[var(--muted-foreground)]">{table.row_count} filas</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {MODULE_TYPES.map(mt => {
+                    {MODULE_TYPES.filter(mt => mt.id !== "email").map(mt => {
                       const Icon = mt.icon;
                       const isSelected = selectedTables[table.name] === mt.id;
                       return (
@@ -694,6 +695,19 @@ export default function NewClientWizard() {
                 </div>
               ))}
             </div>
+            <div className="mt-6 pt-6 border-t border-[var(--border)]">
+              <h4 className="text-sm font-semibold mb-2">Módulos adicionales (sin tabla requerida)</h4>
+              <div className="border border-[var(--border)] rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", moduleConfigs["__email__"] ? "bg-brand-purple/10" : "bg-[var(--muted)]")}><Mail className={cn("w-4 h-4", moduleConfigs["__email__"] ? "text-brand-purple" : "text-[var(--muted-foreground)]")} /></div>
+                  <div className="flex-1"><span className="font-medium text-sm">Email / Correo</span><p className="text-xs text-[var(--muted-foreground)]">El cliente puede conectar sus cuentas de correo</p></div>
+                  <button onClick={() => { setModuleConfigs(prev => { const next = { ...prev }; if (next["__email__"]) { delete next["__email__"]; } else { next["__email__"] = { tabla_origen: "", tipo: "email", nombre_display: "Email", icono: "Mail", mapeo_campos: {}, config_visual: { tipo_vista: "tabla" }, permite_crear: true, permite_editar: true, permite_eliminar: true }; } return next; }); }}
+                    className={cn("px-4 py-2 rounded-lg text-xs font-medium border transition-all", moduleConfigs["__email__"] ? "border-brand-purple bg-brand-purple/10 text-brand-purple" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-brand-purple/50")}>
+                    {moduleConfigs["__email__"] ? <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Activado</span> : "Activar"}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -701,7 +715,7 @@ export default function NewClientWizard() {
         {step === 5 && (
           <div className="space-y-4 animate-fade-in">
             <div className="card"><h3 className="text-lg font-semibold mb-1">Configurar módulos</h3><p className="text-sm text-[var(--muted-foreground)]">Ajusta nombre, mapeo y permisos</p></div>
-            {Object.entries(moduleConfigs).map(([tableName, config]) => {
+            {Object.entries(moduleConfigs).filter(([, config]) => config.tipo !== "email").map(([tableName, config]) => {
               const table = tables.find(t => t.name === tableName);
               const columns = table?.columns || [];
               return (

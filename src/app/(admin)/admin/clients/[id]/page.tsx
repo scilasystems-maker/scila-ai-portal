@@ -7,7 +7,7 @@ import {
   ArrowLeft, Loader2, Database, Users, Calendar, MessageSquare,
   LayoutGrid, Edit, Trash2, Save, X, Eye, ExternalLink, Shield,
   CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, Mail,
-  Zap, Plus, DollarSign, Percent
+  Zap, Plus, DollarSign, Percent, Globe, Briefcase
 } from "lucide-react";
 import Link from "next/link";
 import { cn, formatDate, formatRelativeTime } from "@/lib/utils";
@@ -340,41 +340,129 @@ export default function ClientDetailPage() {
         </div>
 
         {/* Modules */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Módulos configurados ({modules.length})</h3>
-            <span></span>
-          </div>
-
-          {modules.length === 0 ? (
-            <p className="text-sm text-[var(--muted-foreground)] py-4">Sin módulos configurados</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {modules.map(mod => (
-                <div key={mod.id} className="p-3 rounded-lg border border-[var(--border)] flex items-center gap-3">
-                  {getModuleIcon(mod.tipo)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{mod.nombre_display}</p>
-                    <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
-                      <span className="capitalize">{mod.tipo}</span>
-                      <span>← {mod.tabla_origen}</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    {mod.permite_crear && <span className="w-1.5 h-1.5 rounded-full bg-success" title="Puede crear" />}
-                    {mod.permite_editar && <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan" title="Puede editar" />}
-                    {mod.permite_eliminar && <span className="w-1.5 h-1.5 rounded-full bg-danger" title="Puede eliminar" />}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ClientModulesSection clientId={clientId} modules={modules} onReload={loadClient} />
 
         {/* Agents Contracted */}
         <ClientAgentsSection clientId={clientId} />
       </div>
     </>
+  );
+}
+
+// ── Client Modules Sub-Component ──
+const MOD_TYPES = [
+  { id: "leads", label: "Leads / CRM", icon: Users },
+  { id: "citas", label: "Citas / Reuniones", icon: Calendar },
+  { id: "conversaciones", label: "Conversaciones", icon: MessageSquare },
+  { id: "webs", label: "Webs / Suscripciones", icon: Globe },
+  { id: "empresas", label: "Empresas Contactadas", icon: Briefcase },
+  { id: "email", label: "Email / Correo", icon: Mail },
+  { id: "generico", label: "Genérico", icon: LayoutGrid },
+];
+
+function ClientModulesSection({ clientId, modules, onReload }: { clientId: string; modules: Module[]; onReload: () => void }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingModule, setEditingModule] = useState<Module | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ nombre_display: "", tipo: "generico", tabla_origen: "", icono: "LayoutGrid", permite_crear: true, permite_editar: true, permite_eliminar: true, visible: true });
+
+  const openAdd = () => { setEditingModule(null); setForm({ nombre_display: "", tipo: "generico", tabla_origen: "", icono: "LayoutGrid", permite_crear: true, permite_editar: true, permite_eliminar: true, visible: true }); setModalOpen(true); };
+  const openEdit = (mod: Module) => { setEditingModule(mod); setForm({ nombre_display: mod.nombre_display, tipo: mod.tipo, tabla_origen: mod.tabla_origen, icono: mod.icono, permite_crear: mod.permite_crear, permite_editar: mod.permite_editar, permite_eliminar: mod.permite_eliminar, visible: mod.visible }); setModalOpen(true); };
+
+  const handleTypeChange = (tipo: string) => {
+    const t = MOD_TYPES.find(m => m.id === tipo);
+    setForm(p => ({ ...p, tipo, nombre_display: p.nombre_display || t?.label || "", tabla_origen: tipo === "email" ? "" : p.tabla_origen }));
+  };
+
+  const handleSave = async () => {
+    if (!form.nombre_display) { alert("El nombre es obligatorio"); return; }
+    if (form.tipo !== "email" && form.tipo !== "conversaciones" && !form.tabla_origen) { alert("La tabla origen es obligatoria"); return; }
+    setSaving(true);
+    try {
+      if (editingModule) {
+        const res = await fetch("/api/admin/modules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingModule.id, ...form }) });
+        if (!res.ok) throw new Error((await res.json()).error);
+      } else {
+        const res = await fetch("/api/admin/modules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: clientId, module: form }) });
+        if (!res.ok) throw new Error((await res.json()).error);
+      }
+      setModalOpen(false); onReload();
+    } catch (err: any) { alert(err.message); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (modId: string, nombre: string) => {
+    if (!confirm(`Eliminar el módulo "${nombre}"?`)) return;
+    try { const res = await fetch(`/api/admin/modules?id=${modId}`, { method: "DELETE" }); if (!res.ok) throw new Error((await res.json()).error); onReload(); } catch (err: any) { alert(err.message); }
+  };
+
+  const getIcon = (tipo: string) => { const t = MOD_TYPES.find(m => m.id === tipo); const I = t?.icon || LayoutGrid; return <I className="w-4 h-4" />; };
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold">Módulos configurados ({modules.length})</h3>
+        <button onClick={openAdd} className="btn-primary text-xs flex items-center gap-1"><Plus className="w-3 h-3" />Añadir módulo</button>
+      </div>
+      {modules.length === 0 ? (
+        <p className="text-sm text-[var(--muted-foreground)] py-4">Sin módulos configurados</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {modules.map(mod => (
+            <div key={mod.id} className="p-3 rounded-lg border border-[var(--border)] flex items-center gap-3">
+              {getIcon(mod.tipo)}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{mod.nombre_display}</p>
+                <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
+                  <span className="capitalize">{mod.tipo}</span>
+                  {mod.tabla_origen && <span>← {mod.tabla_origen}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => openEdit(mod)} className="p-1 rounded hover:bg-brand-purple/10 text-[var(--muted-foreground)]"><Edit className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleDelete(mod.id, mod.nombre_display)} className="p-1 rounded hover:bg-danger/10 text-[var(--muted-foreground)]"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modalOpen && (<>
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setModalOpen(false)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+              <h3 className="font-semibold">{editingModule ? "Editar módulo" : "Añadir módulo"}</h3>
+              <button onClick={() => setModalOpen(false)} className="btn-ghost p-1.5"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Tipo de módulo</label>
+                <div className="flex flex-wrap gap-2">{MOD_TYPES.map(mt => { const Icon = mt.icon; return (
+                  <button key={mt.id} onClick={() => handleTypeChange(mt.id)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all", form.tipo === mt.id ? "border-brand-purple bg-brand-purple/10 text-brand-purple" : "border-[var(--border)] text-[var(--muted-foreground)]")}><Icon className="w-3.5 h-3.5" />{mt.label}</button>
+                ); })}</div>
+              </div>
+              <div><label className="block text-sm font-medium mb-1.5">Nombre visible *</label><input className="input-field" value={form.nombre_display} onChange={e => setForm(p => ({ ...p, nombre_display: e.target.value }))} placeholder="Ej: Citas, Email..." /></div>
+              {form.tipo !== "email" && form.tipo !== "conversaciones" && (
+                <div><label className="block text-sm font-medium mb-1.5">Tabla origen</label><input className="input-field" value={form.tabla_origen} onChange={e => setForm(p => ({ ...p, tabla_origen: e.target.value }))} placeholder="Ej: citas, clientes..." /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Nombre exacto de la tabla en Supabase del cliente</p></div>
+              )}
+              {form.tipo === "email" && <div className="p-3 rounded-lg bg-brand-purple/5 border border-brand-purple/20 text-xs text-[var(--muted-foreground)]"><Mail className="w-4 h-4 text-brand-purple inline mr-1.5" />El módulo Email no necesita tabla. El cliente conecta sus cuentas desde su portal.</div>}
+              <div>
+                <label className="block text-sm font-medium mb-2">Permisos</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.permite_crear} onChange={e => setForm(p => ({ ...p, permite_crear: e.target.checked }))} className="rounded" />Crear</label>
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.permite_editar} onChange={e => setForm(p => ({ ...p, permite_editar: e.target.checked }))} className="rounded" />Editar</label>
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.permite_eliminar} onChange={e => setForm(p => ({ ...p, permite_eliminar: e.target.checked }))} className="rounded" />Eliminar</label>
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.visible} onChange={e => setForm(p => ({ ...p, visible: e.target.checked }))} className="rounded" />Visible</label>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setModalOpen(false)} className="btn-secondary">Cancelar</button>
+                <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{saving ? "Guardando..." : "Guardar"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>)}
+    </div>
   );
 }
 
