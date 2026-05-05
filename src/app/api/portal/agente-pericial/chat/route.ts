@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 const N8N_WEBHOOK = process.env.N8N_AGENTE_PERICIAL_URL || "https://scilaai-n8n.l5wzcm.easypanel.host/webhook/agente-pericial-chat";
 

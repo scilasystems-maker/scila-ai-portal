@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/shared/Header";
 import {
   ArrowLeft, Loader2, Database, Users, Calendar, MessageSquare,
-  LayoutGrid, Edit, Trash2, Save, X, Eye, ExternalLink, Shield,
+  LayoutGrid, Edit, Trash2, Bot, Save, X, Eye, ExternalLink, Shield,
   CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, Mail,
   Zap, Plus, DollarSign, Percent, Globe, Briefcase
 } from "lucide-react";

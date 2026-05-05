@@ -161,7 +161,7 @@ export default function AgentePericialPage() {
           <div className="flex flex-col" style={{ height: "calc(100vh - 220px)" }}>
             {messages.length === 0 ? (
               <div
-                onDrop={e => { e.preventDefault(); e.dataTransfer.files[0] && handleFileChange(e.dataTransfer.files[0]); }}
+                onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) handleFileChange(e.dataTransfer.files[0]); }}
                 onDragOver={e => e.preventDefault()}
                 onClick={() => fileInputRef.current?.click()}
                 className="card flex flex-col items-center justify-center gap-4 py-20 cursor-pointer border-2 border-dashed border-[var(--border)] hover:border-brand-purple/50 hover:bg-brand-purple/5 transition-all flex-1"
