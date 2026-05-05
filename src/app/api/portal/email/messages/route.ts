@@ -26,9 +26,29 @@ async function getImap(account: any): Promise<ImapFlow> {
 
 function parseAddr(addr: any): { name: string; email: string }[] {
   if (!addr) return [];
-  if (Array.isArray(addr)) return addr.map(a => ({ name: a.name || "", email: a.address || a.email || "" }));
+  if (Array.isArray(addr)) return addr.map((a: any) => ({ name: a.name || "", email: a.address || a.email || "" }));
   if (addr.value && Array.isArray(addr.value)) return addr.value.map((a: any) => ({ name: a.name || "", email: a.address || "" }));
   return [{ name: addr.name || "", email: addr.address || addr.email || String(addr) }];
+}
+
+function walkFolders(items: any[], folders: any[]): void {
+  for (const item of items) {
+    folders.push({ name: item.name, path: item.path || item.name, specialUse: item.specialUse || null });
+    if (item.folders?.length) walkFolders(item.folders, folders);
+  }
+}
+
+function findTrashPath(items: any[]): string {
+  for (const item of items) {
+    if (item.specialUse === "\\Trash" || ["trash", "papelera"].includes((item.name || "").toLowerCase())) return item.path;
+    if (item.folders) { const found = findTrashPath(item.folders); if (found) return found; }
+  }
+  return "";
+}
+
+function getMailboxExists(mailbox: any): number {
+  if (!mailbox || typeof mailbox === "boolean") return 0;
+  return (mailbox as any).exists || 0;
 }
 
 async function auth(request: Request) {
@@ -55,13 +75,7 @@ export async function GET(request: Request) {
       try {
         const folders: any[] = [];
         const tree = await client.listTree();
-        function walk(items: any[]) {
-          for (const item of items) {
-            folders.push({ name: item.name, path: item.path || item.name, specialUse: item.specialUse || null });
-            if (item.folders?.length) walk(item.folders);
-          }
-        }
-        walk(tree.folders || []);
+        walkFolders(tree.folders || [], folders);
         return NextResponse.json({ folders });
       } finally { await client.logout(); }
     }
@@ -74,19 +88,20 @@ export async function GET(request: Request) {
       try {
         const lock = await client.getMailboxLock(folder);
         try {
-          const total = client.mailbox?.exists || 0;
+          const total = getMailboxExists(client.mailbox);
           if (total === 0) return NextResponse.json({ messages: [], total: 0, page: pg, pages: 0 });
           const start = Math.max(1, total - (pg * limit) + 1);
           const end = Math.max(1, total - ((pg - 1) * limit));
           const messages: any[] = [];
           for await (const msg of client.fetch(`${start}:${end}`, { envelope: true, flags: true, uid: true })) {
+            const m = msg as any;
             messages.push({
-              uid: msg.uid, flags: Array.from(msg.flags || []),
-              seen: msg.flags?.has("\\Seen") || false, flagged: msg.flags?.has("\\Flagged") || false,
-              date: msg.envelope?.date?.toISOString() || null,
-              subject: msg.envelope?.subject || "(Sin asunto)",
-              from: parseAddr(msg.envelope?.from), to: parseAddr(msg.envelope?.to),
-              cc: parseAddr(msg.envelope?.cc), messageId: msg.envelope?.messageId || null,
+              uid: m.uid, flags: Array.from(m.flags || []),
+              seen: m.flags?.has("\\Seen") || false, flagged: m.flags?.has("\\Flagged") || false,
+              date: m.envelope?.date?.toISOString() || null,
+              subject: m.envelope?.subject || "(Sin asunto)",
+              from: parseAddr(m.envelope?.from), to: parseAddr(m.envelope?.to),
+              cc: parseAddr(m.envelope?.cc), messageId: m.envelope?.messageId || null,
             });
           }
           messages.sort((a, b) => (b.date ? new Date(b.date).getTime() : 0) - (a.date ? new Date(a.date).getTime() : 0));
@@ -104,19 +119,19 @@ export async function GET(request: Request) {
         const lock = await client.getMailboxLock(folder);
         try {
           await client.messageFlagsAdd({ uid: parseInt(uid) }, ["\\Seen"], { uid: true });
-          const msg = await client.fetchOne(uid, { envelope: true, source: true, flags: true, uid: true }, { uid: true });
+          const msg = await client.fetchOne(uid, { envelope: true, source: true, flags: true, uid: true }, { uid: true }) as any;
           let htmlBody = "", textBody = "";
           let attachments: any[] = [];
-          if (msg.source) {
+          if (msg && msg.source) {
             const parsed = simpleParseEmail(msg.source.toString());
             htmlBody = parsed.html; textBody = parsed.text; attachments = parsed.attachments;
           }
           return NextResponse.json({
-            uid: msg.uid, flags: Array.from(msg.flags || []),
-            subject: msg.envelope?.subject || "(Sin asunto)",
-            from: parseAddr(msg.envelope?.from), to: parseAddr(msg.envelope?.to),
-            cc: parseAddr(msg.envelope?.cc), date: msg.envelope?.date?.toISOString() || null,
-            messageId: msg.envelope?.messageId || null, html: htmlBody, text: textBody, attachments,
+            uid: msg?.uid, flags: Array.from(msg?.flags || []),
+            subject: msg?.envelope?.subject || "(Sin asunto)",
+            from: parseAddr(msg?.envelope?.from), to: parseAddr(msg?.envelope?.to),
+            cc: parseAddr(msg?.envelope?.cc), date: msg?.envelope?.date?.toISOString() || null,
+            messageId: msg?.envelope?.messageId || null, html: htmlBody, text: textBody, attachments,
           });
         } finally { lock.release(); }
       } finally { await client.logout(); }
@@ -164,11 +179,9 @@ export async function POST(request: Request) {
         const lock = await client.getMailboxLock(folder);
         try {
           const tree = await client.listTree();
-          let trashPath = "";
-          function findTrash(items: any[]) { for (const item of items) { if (item.specialUse === "\\Trash" || ["trash", "papelera"].includes((item.name || "").toLowerCase())) { trashPath = item.path; return; } if (item.folders) findTrash(item.folders); } }
-          findTrash(tree.folders || []);
+          const trashPath = findTrashPath(tree.folders || []);
           if (trashPath && folder !== trashPath) { await client.messageMove({ uid }, trashPath, { uid: true }); }
-          else { await client.messageFlagsAdd({ uid }, ["\\Deleted"], { uid: true }); await client.expunge({ uid }); }
+          else { await client.messageFlagsAdd({ uid }, ["\\Deleted"], { uid: true }); }
         } finally { lock.release(); }
         return NextResponse.json({ success: true });
       } finally { await client.logout(); }
