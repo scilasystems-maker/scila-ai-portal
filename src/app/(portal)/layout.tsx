@@ -6,13 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Sidebar, type NavItem } from "@/components/shared/Sidebar";
 import {
   LayoutDashboard, MessageSquare, Users2, UserCircle,
-  Calendar, Users, LayoutGrid, Image, FileText, BarChart3, Mail,
+  Calendar, Users, LayoutGrid, Image, FileText, BarChart3, Mail, Bot,
   type LucideIcon
 } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard, MessageSquare, Users2, UserCircle,
-  Calendar, Users, LayoutGrid, Image, FileText, BarChart3, Mail,
+  Calendar, Users, LayoutGrid, Image, FileText, BarChart3, Mail, Bot,
 };
 
 function getIcon(iconName: string): LucideIcon {
@@ -68,6 +68,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               label: mod.nombre_display || "Email",
               href: "/portal/email",
               icon: Mail,
+            });
+          } else if (mod.tipo === "agente_pericial") {
+            items.push({
+              id: `mod-${mod.id}`,
+              label: mod.nombre_display || "Agente Pericial",
+              href: "/portal/agente-pericial",
+              icon: Bot,
             });
           } else {
             items.push({
