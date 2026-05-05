@@ -154,7 +154,6 @@ export default function ClientDetailPage() {
       case "citas": return <Calendar className="w-4 h-4 text-brand-cyan" />;
       case "conversaciones": return <MessageSquare className="w-4 h-4 text-success" />;
       case "agente_pericial": return <Bot className="w-4 h-4 text-brand-cyan" />;
-      case "agente_pericial": return <Bot className="w-4 h-4 text-brand-cyan" />;
       default: return <LayoutGrid className="w-4 h-4 text-warning" />;
     }
   };
@@ -360,7 +359,6 @@ const MOD_TYPES = [
   { id: "empresas", label: "Empresas Contactadas", icon: Briefcase },
   { id: "email", label: "Email / Correo", icon: Mail },
   { id: "agente_pericial", label: "Agente Pericial IA", icon: Bot },
-  { id: "agente_pericial", label: "Agente Pericial IA", icon: Bot },
   { id: "generico", label: "Genérico", icon: LayoutGrid },
 ];
 
@@ -449,7 +447,6 @@ function ClientModulesSection({ clientId, modules, onReload }: { clientId: strin
                 <div><label className="block text-sm font-medium mb-1.5">Tabla origen</label><input className="input-field" value={form.tabla_origen} onChange={e => setForm(p => ({ ...p, tabla_origen: e.target.value }))} placeholder="Ej: citas, clientes..." /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Nombre exacto de la tabla en Supabase del cliente</p></div>
               )}
               {form.tipo === "email" && <div className="p-3 rounded-lg bg-brand-purple/5 border border-brand-purple/20 text-xs text-[var(--muted-foreground)]"><Mail className="w-4 h-4 text-brand-purple inline mr-1.5" />El módulo Email no necesita tabla. El cliente conecta sus cuentas desde su portal.</div>}
-              {form.tipo === "agente_pericial" && <div className="p-3 rounded-lg bg-brand-cyan/5 border border-brand-cyan/20 text-xs text-[var(--muted-foreground)]"><Bot className="w-4 h-4 text-brand-cyan inline mr-1.5" />Activa el chat del agente pericial y el dashboard de informes y clientes.</div>}
               {form.tipo === "agente_pericial" && <div className="p-3 rounded-lg bg-brand-cyan/5 border border-brand-cyan/20 text-xs text-[var(--muted-foreground)]"><Bot className="w-4 h-4 text-brand-cyan inline mr-1.5" />El Agente Pericial IA no necesita tabla. Activa el chat y el dashboard de informes periciales conectado a N8N.</div>}
               <div>
                 <label className="block text-sm font-medium mb-2">Permisos</label>
