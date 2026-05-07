@@ -41,6 +41,60 @@ function EstadoBadge({ estado }: { estado: string }) {
   );
 }
 
+// Renderizador de Markdown mínimo: negrita, cursiva, listas, saltos de línea
+function MarkdownText({ content }: { content: string }) {
+  const lines = content.split("\n");
+  return (
+    <div className="space-y-1">
+      {lines.map((line, i) => {
+        // Línea vacía
+        if (!line.trim()) return <div key={i} className="h-1" />;
+
+        // Lista con - o •
+        const isList = /^[\-•]\s+/.test(line.trim());
+        const text = isList ? line.trim().replace(/^[\-•]\s+/, "") : line;
+
+        // Parsear negrita e itálica inline
+        const parsed = parseInline(text);
+
+        if (isList) {
+          return (
+            <div key={i} className="flex gap-2">
+              <span className="mt-1 text-current opacity-60 flex-shrink-0">•</span>
+              <span>{parsed}</span>
+            </div>
+          );
+        }
+        return <div key={i}>{parsed}</div>;
+      })}
+    </div>
+  );
+}
+
+function parseInline(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  // Regex: **bold**, *italic*, y texto normal
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let last = 0;
+  let match;
+  let key = 0;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) {
+      parts.push(<span key={key++}>{text.slice(last, match.index)}</span>);
+    }
+    if (match[0].startsWith("**")) {
+      parts.push(<strong key={key++} className="font-semibold">{match[2]}</strong>);
+    } else {
+      parts.push(<em key={key++}>{match[3]}</em>);
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) {
+    parts.push(<span key={key++}>{text.slice(last)}</span>);
+  }
+  return parts;
+}
+
 export default function AgentePericialPage() {
   const [tab, setTab] = useState<"chat" | "informes" | "clientes">("chat");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -194,11 +248,16 @@ export default function AgentePericialPage() {
                   {messages.map((msg, i) => (
                     <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
                       <div className={cn(
-                        "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+                        "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
                         msg.role === "user"
                           ? "bg-brand-purple text-white rounded-tr-sm"
                           : "bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-sm"
-                      )}>{msg.content}</div>
+                      )}>
+                        {msg.role === "assistant"
+                          ? <MarkdownText content={msg.content} />
+                          : msg.content
+                        }
+                      </div>
                     </div>
                   ))}
                   {loading && (
