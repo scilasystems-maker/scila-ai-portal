@@ -359,33 +359,89 @@ const MOD_TYPES = [
   { id: "empresas", label: "Empresas Contactadas", icon: Briefcase },
   { id: "email", label: "Email / Correo", icon: Mail },
   { id: "agente_pericial", label: "Agente Pericial IA", icon: Bot },
+  { id: "clientes_pericial", label: "Clientes Pericial", icon: Users },
+  { id: "informes_pericial", label: "Informes Pericial", icon: Database },
+  { id: "citas_pericial", label: "Citas Pericial", icon: Calendar },
+  { id: "documentacion_pericial", label: "Documentación Pericial", icon: Database },
   { id: "generico", label: "Genérico", icon: LayoutGrid },
 ];
+
+const NO_TABLE_TYPES = ["email", "conversaciones", "agente_pericial", "documentacion_pericial"];
 
 function ClientModulesSection({ clientId, modules, onReload }: { clientId: string; modules: Module[]; onReload: () => void }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ nombre_display: "", tipo: "generico", tabla_origen: "", icono: "LayoutGrid", permite_crear: true, permite_editar: true, permite_eliminar: true, visible: true });
+  const [form, setForm] = useState({ nombre_display: "", tipo: "generico", tabla_origen: "", icono: "LayoutGrid", permite_crear: true, permite_editar: true, permite_eliminar: true, visible: true, webhook_url: "" });
+  const [tables, setTables] = useState<{ name: string; row_count: number }[]>([]);
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [tablesLoaded, setTablesLoaded] = useState(false);
 
-  const openAdd = () => { setEditingModule(null); setForm({ nombre_display: "", tipo: "generico", tabla_origen: "", icono: "LayoutGrid", permite_crear: true, permite_editar: true, permite_eliminar: true, visible: true }); setModalOpen(true); };
-  const openEdit = (mod: Module) => { setEditingModule(mod); setForm({ nombre_display: mod.nombre_display, tipo: mod.tipo, tabla_origen: mod.tabla_origen, icono: mod.icono, permite_crear: mod.permite_crear, permite_editar: mod.permite_editar, permite_eliminar: mod.permite_eliminar, visible: mod.visible }); setModalOpen(true); };
+  const loadTables = async () => {
+    if (tablesLoaded) return;
+    setLoadingTables(true);
+    try {
+      const res = await fetch(`/api/admin/detect-tables-by-client?cliente_id=${clientId}`);
+      const data = await res.json();
+      if (res.ok && data.tables) { setTables(data.tables); setTablesLoaded(true); }
+      else { console.error(data.error); }
+    } catch (e) { console.error(e); }
+    finally { setLoadingTables(false); }
+  };
+
+  const openAdd = () => {
+    setEditingModule(null);
+    setForm({ nombre_display: "", tipo: "generico", tabla_origen: "", icono: "LayoutGrid", permite_crear: true, permite_editar: true, permite_eliminar: true, visible: true, webhook_url: "" });
+    setModalOpen(true);
+    loadTables();
+  };
+
+  const openEdit = (mod: Module) => {
+    setEditingModule(mod);
+    setForm({ nombre_display: mod.nombre_display, tipo: mod.tipo, tabla_origen: mod.tabla_origen, icono: mod.icono, permite_crear: mod.permite_crear, permite_editar: mod.permite_editar, permite_eliminar: mod.permite_eliminar, visible: mod.visible, webhook_url: mod.config_visual?.webhook_url || "", tabla_solicitudes: mod.config_visual?.tabla_solicitudes || "", tabla_documentos: mod.config_visual?.tabla_documentos || "", columna_storage: mod.config_visual?.columna_storage || "", bucket_name: mod.config_visual?.bucket_name || "", webhook_completar: mod.config_visual?.webhook_completar || "" } as any);
+    setModalOpen(true);
+    loadTables();
+  };
 
   const handleTypeChange = (tipo: string) => {
     const t = MOD_TYPES.find(m => m.id === tipo);
-    setForm(p => ({ ...p, tipo, nombre_display: p.nombre_display || t?.label || "", tabla_origen: (tipo === "email" || tipo === "agente_pericial") ? "" : p.tabla_origen }));
+    setForm(p => ({ ...p, tipo, nombre_display: p.nombre_display || t?.label || "", tabla_origen: NO_TABLE_TYPES.includes(tipo) ? "" : p.tabla_origen }));
   };
 
   const handleSave = async () => {
     if (!form.nombre_display) { alert("El nombre es obligatorio"); return; }
-    if (form.tipo !== "email" && form.tipo !== "conversaciones" && form.tipo !== "agente_pericial" && !form.tabla_origen) { alert("La tabla origen es obligatoria"); return; }
+    if (!NO_TABLE_TYPES.includes(form.tipo) && !form.tabla_origen) { alert("Selecciona una tabla origen"); return; }
+    if (form.tipo === "agente_pericial" && !form.webhook_url) { alert("La URL del webhook de N8N es obligatoria"); return; }
+    if (form.tipo === "documentacion_pericial" && !form.webhook_url) { alert("La URL del webhook de N8N es obligatoria"); return; }
     setSaving(true);
     try {
+      const payload: Record<string, any> = { ...form };
+      if (form.tipo === "agente_pericial") {
+        payload.config_visual = { ...(editingModule?.config_visual || {}), webhook_url: form.webhook_url };
+      }
+      if (form.tipo === "documentacion_pericial") {
+        payload.config_visual = {
+          ...(editingModule?.config_visual || {}),
+          webhook_url: form.webhook_url,
+          webhook_completar: (form as any).webhook_completar || "",
+          tabla_solicitudes: (form as any).tabla_solicitudes || "solicitudes_documentacion",
+          tabla_documentos: (form as any).tabla_documentos || "documentos_recibidos",
+          columna_storage: (form as any).columna_storage || "url_storage",
+          bucket_name: (form as any).bucket_name || "documentos-periciales",
+        };
+      }
+      delete payload.webhook_url;
+      delete payload.webhook_completar;
+      delete payload.tabla_solicitudes;
+      delete payload.tabla_documentos;
+      delete payload.columna_storage;
+      delete payload.bucket_name;
+
       if (editingModule) {
-        const res = await fetch("/api/admin/modules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingModule.id, ...form }) });
+        const res = await fetch("/api/admin/modules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingModule.id, ...payload }) });
         if (!res.ok) throw new Error((await res.json()).error);
       } else {
-        const res = await fetch("/api/admin/modules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: clientId, module: form }) });
+        const res = await fetch("/api/admin/modules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: clientId, module: payload }) });
         if (!res.ok) throw new Error((await res.json()).error);
       }
       setModalOpen(false); onReload();
@@ -398,6 +454,8 @@ function ClientModulesSection({ clientId, modules, onReload }: { clientId: strin
   };
 
   const getIcon = (tipo: string) => { const t = MOD_TYPES.find(m => m.id === tipo); const I = t?.icon || LayoutGrid; return <I className="w-4 h-4" />; };
+
+  const needsTable = !NO_TABLE_TYPES.includes(form.tipo);
 
   return (
     <div className="card">
@@ -417,6 +475,7 @@ function ClientModulesSection({ clientId, modules, onReload }: { clientId: strin
                 <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
                   <span className="capitalize">{mod.tipo}</span>
                   {mod.tabla_origen && <span>← {mod.tabla_origen}</span>}
+                  {mod.config_visual?.webhook_url && <span className="truncate max-w-[150px]" title={mod.config_visual.webhook_url}>🔗 webhook</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -430,24 +489,69 @@ function ClientModulesSection({ clientId, modules, onReload }: { clientId: strin
       {modalOpen && (<>
         <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setModalOpen(false)} />
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--card)] z-10">
               <h3 className="font-semibold">{editingModule ? "Editar módulo" : "Añadir módulo"}</h3>
               <button onClick={() => setModalOpen(false)} className="btn-ghost p-1.5"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
+              {/* Tipo */}
               <div>
                 <label className="block text-sm font-medium mb-2">Tipo de módulo</label>
                 <div className="flex flex-wrap gap-2">{MOD_TYPES.map(mt => { const Icon = mt.icon; return (
                   <button key={mt.id} onClick={() => handleTypeChange(mt.id)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all", form.tipo === mt.id ? "border-brand-purple bg-brand-purple/10 text-brand-purple" : "border-[var(--border)] text-[var(--muted-foreground)]")}><Icon className="w-3.5 h-3.5" />{mt.label}</button>
                 ); })}</div>
               </div>
+
+              {/* Nombre */}
               <div><label className="block text-sm font-medium mb-1.5">Nombre visible *</label><input className="input-field" value={form.nombre_display} onChange={e => setForm(p => ({ ...p, nombre_display: e.target.value }))} placeholder="Ej: Citas, Email..." /></div>
-              {form.tipo !== "email" && form.tipo !== "conversaciones" && (
-                <div><label className="block text-sm font-medium mb-1.5">Tabla origen</label><input className="input-field" value={form.tabla_origen} onChange={e => setForm(p => ({ ...p, tabla_origen: e.target.value }))} placeholder="Ej: citas, clientes..." /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Nombre exacto de la tabla en Supabase del cliente</p></div>
+
+              {/* Tabla origen — dropdown con tablas detectadas */}
+              {needsTable && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Tabla origen *</label>
+                  {loadingTables ? (
+                    <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)] py-2"><Loader2 className="w-4 h-4 animate-spin" />Detectando tablas del cliente...</div>
+                  ) : tables.length > 0 ? (
+                    <select className="input-field" value={form.tabla_origen} onChange={e => setForm(p => ({ ...p, tabla_origen: e.target.value }))}>
+                      <option value="">— Selecciona una tabla —</option>
+                      {tables.map(t => (
+                        <option key={t.name} value={t.name}>{t.name} ({t.row_count} filas)</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div>
+                      <input className="input-field" value={form.tabla_origen} onChange={e => setForm(p => ({ ...p, tabla_origen: e.target.value }))} placeholder="Nombre de la tabla" />
+                      <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">No se pudieron detectar tablas. Escribe el nombre manualmente.</p>
+                    </div>
+                  )}
+                  {tables.length > 0 && form.tabla_origen && (
+                    <p className="text-[10px] text-success mt-1">✓ Tabla seleccionada: {form.tabla_origen}</p>
+                  )}
+                </div>
               )}
+
+              {/* Info boxes para tipos especiales */}
               {form.tipo === "email" && <div className="p-3 rounded-lg bg-brand-purple/5 border border-brand-purple/20 text-xs text-[var(--muted-foreground)]"><Mail className="w-4 h-4 text-brand-purple inline mr-1.5" />El módulo Email no necesita tabla. El cliente conecta sus cuentas desde su portal.</div>}
-              {form.tipo === "agente_pericial" && <div className="p-3 rounded-lg bg-brand-cyan/5 border border-brand-cyan/20 text-xs text-[var(--muted-foreground)]"><Bot className="w-4 h-4 text-brand-cyan inline mr-1.5" />El Agente Pericial IA no necesita tabla. Activa el chat y el dashboard de informes periciales conectado a N8N.</div>}
+
+              {form.tipo === "agente_pericial" && <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-brand-cyan/5 border border-brand-cyan/20 text-xs text-[var(--muted-foreground)]"><Bot className="w-4 h-4 text-brand-cyan inline mr-1.5" />El Agente Pericial se conecta a un workflow de N8N mediante webhook.</div>
+                <div><label className="block text-sm font-medium mb-1.5">URL Webhook N8N *</label><input className="input-field" value={form.webhook_url} onChange={e => setForm(p => ({ ...p, webhook_url: e.target.value }))} placeholder="https://tu-n8n.com/webhook/agente-pericial-chat" /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">URL del webhook de N8N que procesa los mensajes del chat pericial</p></div>
+              </div>}
+
+              {form.tipo === "documentacion_pericial" && <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-brand-cyan/5 border border-brand-cyan/20 text-xs text-[var(--muted-foreground)]"><Database className="w-4 h-4 text-brand-cyan inline mr-1.5" />Documentación Pericial muestra citas completadas y permite solicitar documentación al asegurado via N8N.</div>
+                <div><label className="block text-sm font-medium mb-1.5">URL Webhook N8N (Chat) *</label><input className="input-field" value={form.webhook_url} onChange={e => setForm(p => ({ ...p, webhook_url: e.target.value }))} placeholder="https://tu-n8n.com/webhook/documentacion-pericial" /></div>
+                <div><label className="block text-sm font-medium mb-1.5">URL Webhook Marcar Completa</label><input className="input-field" value={(form as any).webhook_completar || ""} onChange={e => setForm(p => ({ ...p, webhook_completar: e.target.value } as any))} placeholder="https://tu-n8n.com/webhook/marcar-completa" /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Webhook que se llama al marcar documentación como completa</p></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium mb-1">Tabla solicitudes *</label><input className="input-field text-xs" value={(form as any).tabla_solicitudes || ""} onChange={e => setForm(p => ({ ...p, tabla_solicitudes: e.target.value } as any))} placeholder="solicitudes_documentacion" /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Tabla con los documentos solicitados</p></div>
+                  <div><label className="block text-xs font-medium mb-1">Tabla documentos *</label><input className="input-field text-xs" value={(form as any).tabla_documentos || ""} onChange={e => setForm(p => ({ ...p, tabla_documentos: e.target.value } as any))} placeholder="documentos_recibidos" /><p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Tabla con los archivos recibidos</p></div>
+                  <div><label className="block text-xs font-medium mb-1">Columna ruta archivo</label><input className="input-field text-xs" value={(form as any).columna_storage || ""} onChange={e => setForm(p => ({ ...p, columna_storage: e.target.value } as any))} placeholder="url_storage" /></div>
+                  <div><label className="block text-xs font-medium mb-1">Nombre bucket Storage</label><input className="input-field text-xs" value={(form as any).bucket_name || ""} onChange={e => setForm(p => ({ ...p, bucket_name: e.target.value } as any))} placeholder="documentos-periciales" /></div>
+                </div>
+              </div>}
+
+              {/* Permisos */}
               <div>
                 <label className="block text-sm font-medium mb-2">Permisos</label>
                 <div className="flex gap-4">
@@ -457,6 +561,7 @@ function ClientModulesSection({ clientId, modules, onReload }: { clientId: strin
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.visible} onChange={e => setForm(p => ({ ...p, visible: e.target.checked }))} className="rounded" />Visible</label>
                 </div>
               </div>
+
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => setModalOpen(false)} className="btn-secondary">Cancelar</button>
                 <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{saving ? "Guardando..." : "Guardar"}</button>

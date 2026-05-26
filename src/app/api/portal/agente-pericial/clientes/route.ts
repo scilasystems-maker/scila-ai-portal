@@ -13,41 +13,31 @@ export async function GET(request: Request) {
 
     const adminDb = await createAdminSupabase();
     const { data: portalUser } = await adminDb
-      .from("portal_usuarios")
-      .select("cliente_id")
-      .eq("auth_user_id", user.id)
-      .single();
-
+      .from("portal_usuarios").select("cliente_id").eq("auth_user_id", user.id).single();
     if (!portalUser?.cliente_id) return NextResponse.json([], { status: 200 });
 
     const { data: clientData } = await adminDb
-      .from("portal_clientes")
-      .select("supabase_url, supabase_key, id")
-      .eq("id", portalUser.cliente_id)
-      .single();
-
+      .from("portal_clientes").select("supabase_url, supabase_key").eq("id", portalUser.cliente_id).single();
     if (!clientData?.supabase_url || !clientData?.supabase_key) return NextResponse.json([], { status: 200 });
 
-    const franciscoDb = createClientSupabase(clientData.supabase_url, clientData.supabase_key);
+    const clientDb = createClientSupabase(clientData.supabase_url, clientData.supabase_key);
 
     // Si piden los informes de un cliente específico
     if (clienteId) {
-      const { data: informes, error } = await franciscoDb
+      const { data: informes, error } = await clientDb
         .from("informes_periciales")
-        .select("id, numero_informe, aseguradora, municipio_siniestro, estado, creado_en")
+        .select("id, numero_informe, numero_siniestro, aseguradora, estado, creado_en")
         .eq("cliente_id", clienteId)
-        .eq("user_id", clientData.id)
-        .order("numero_informe", { ascending: false });
+        .order("creado_en", { ascending: false });
 
       if (error) throw error;
       return NextResponse.json(informes || []);
     }
 
     // Lista de clientes
-    const { data: clientes, error } = await franciscoDb
+    const { data: clientes, error } = await clientDb
       .from("clientes")
-      .select("id, nombre, telefono, municipio")
-      .eq("user_id", clientData.id)
+      .select("id, nombre, telefono, municipio, direccion, codigo_postal")
       .order("nombre", { ascending: true });
 
     if (error) throw error;

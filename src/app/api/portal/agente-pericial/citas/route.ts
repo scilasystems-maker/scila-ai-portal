@@ -19,13 +19,13 @@ export async function GET() {
 
     const clientDb = createClientSupabase(clientData.supabase_url, clientData.supabase_key);
 
-    const { data: informes, error } = await clientDb
-      .from("informes_periciales")
-      .select("*, clientes(nombre)")
-      .order("creado_en", { ascending: false });
+    const { data: citas, error } = await clientDb
+      .from("citas")
+      .select("*, informes_periciales(numero_informe), clientes(nombre)")
+      .order("fecha_hora", { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(informes || []);
+    return NextResponse.json(citas || []);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

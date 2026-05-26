@@ -76,6 +76,34 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               href: "/portal/agente-pericial",
               icon: Bot,
             });
+          } else if (mod.tipo === "clientes_pericial") {
+            items.push({
+              id: `mod-${mod.id}`,
+              label: mod.nombre_display || "Clientes Pericial",
+              href: "/portal/clientes-pericial",
+              icon: Users2,
+            });
+          } else if (mod.tipo === "informes_pericial") {
+            items.push({
+              id: `mod-${mod.id}`,
+              label: mod.nombre_display || "Informes Pericial",
+              href: "/portal/informes-pericial",
+              icon: FileText,
+            });
+          } else if (mod.tipo === "citas_pericial") {
+            items.push({
+              id: `mod-${mod.id}`,
+              label: mod.nombre_display || "Citas Pericial",
+              href: "/portal/citas-pericial",
+              icon: Calendar,
+            });
+          } else if (mod.tipo === "documentacion_pericial") {
+            items.push({
+              id: `mod-${mod.id}`,
+              label: mod.nombre_display || "Documentación Pericial",
+              href: "/portal/documentacion-pericial",
+              icon: FileText,
+            });
           } else {
             items.push({
               id: `mod-${mod.id}`,
